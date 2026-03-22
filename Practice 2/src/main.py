@@ -100,6 +100,26 @@ def gridSearch():
                             
     return best_parameters, best_score
 
+def init_population(pop_size):
+    """
+    Generates the initial population of individuals for the Genetic Algorithm.
+    Each individual represents a random set of hyperparameters.
+    
+    Args:
+        pop_size (int): The number of individuals in the population.
+        
+    Returns:
+        list: A list of dictionaries, where each dictionary is an individual.
+    """
+    population = []
+    
+    for _ in range(pop_size):
+        # We assume generate_random_params() is already defined and 
+        # returns a valid dictionary of random hyperparameters.
+        individual = generate_random_params()
+        population.append(individual)
+        
+    return population
 
 if name == "main":
     # Obtain the current directory of the script to build the path to the dataset
@@ -113,7 +133,7 @@ if name == "main":
     data["quality"] = (data["quality"] >= 6).astype(int)
     X = data.drop("quality", axis=1)
     y = data["quality"]
-    
+
     best_random_parameters, best_random_score = RandomSearch()
     best_grid_parameters, best_grid_score = gridSearch()
     print("Best parameters from Random Search:", best_random_parameters, "with accuracy:", best_random_score)
