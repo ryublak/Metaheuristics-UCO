@@ -18,7 +18,7 @@ To run any of the assignments locally, ensure you have [uv](https://github.com/a
 
 1. **Clone this repository:**
    ```bash
-   git clone [https://github.com/your-username/your-repo-name.git](https://github.com/your-username/your-repo-name.git)
+   git clone https://github.com/ryublak/Metaheuristics-UCO.git
    ```
 
 2. **Navigate to the desired assignment folder:**
@@ -42,4 +42,6 @@ uv run src/main.py
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Copyright (c) 2026 [Rafael Carlo Schoettel Vilchez/Jesus Lopez]. All rights reserved. 
+
+This code is for purely academic purposes. Unauthorized use, copying, modification, or distribution of this project, via any medium, is strictly prohibited without express permission.
