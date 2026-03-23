@@ -100,7 +100,7 @@ def gridSearch():
                             
     return best_parameters, best_score
 
-def init_population(pop_size):
+def init_population(pop_size=20):
     """
     Generates the initial population of individuals for the Genetic Algorithm.
     Each individual represents a random set of hyperparameters.
@@ -120,6 +120,49 @@ def init_population(pop_size):
         population.append(individual)
         
     return population
+
+def evaluate_population(population):
+    """
+    Evaluates all individuals in the current population.
+    
+    Args:
+        population (list): The list of individuals (hyperparameter combinations).
+        
+    Returns:
+        list: A list of fitness scores corresponding to each individual.
+    """
+    fitness_scores=[]
+    for i in population:
+        score=evaluate_solution(i)
+        fitness_scores.append(score)
+        
+    return fitness_scores
+
+def tournament_selection(population, fitness_scores, k=3):
+    """
+    Selects an individual from the population using tournament selection.
+    
+    Args:
+        population (list): List containing all individuals of the current generation.
+        fitness_scores (list): List with the evaluation scores (e.g., accuracy) of each individual.
+        k (int): Number of participants in the tournament (3 is a good balance).
+        
+    Returns:
+        list: A copy of the winning individual's hyperparameters.
+    """
+    # 1. Choose 'k' random participants from our population
+    indexes=random.sample(range(len(population)),k)
+    # 2. Find which of these participants has the best score
+    best_index=indexes[0]
+    best_score=fitness_scores[best_index]
+    
+    for index in range (1,(len(indexes))):
+        if (fitness_scores[index]>best_score):
+            best_score=fitness_scores[index]
+            best_index=index
+    # 3. Return the winner (copy to avoid accidental modifications)
+    return population[best_index].copy()
+
 
 if name == "main":
     # Obtain the current directory of the script to build the path to the dataset
