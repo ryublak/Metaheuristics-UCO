@@ -10,6 +10,11 @@ from pathlib import Path
 
 
 def generate_random_params():
+    """Generates random values for the random forest within the ranges of the problem statement.
+
+    Returns:
+        list: A list containing the values.
+    """    
     return [
         random.randint(10, 300),          # params[0]: n_estimators
         random.randint(2, 30),           # params[1]: max_depth
@@ -24,6 +29,14 @@ def generate_random_params():
     ]
 
 def evaluate_solution(params):
+    """_summary_
+
+    Args:
+        params (list): Should contain a list of values generated with generate_random_params() function.
+
+    Returns:
+        float: The mean of scores generated from cross_val_score function.
+    """    
     model = RandomForestClassifier(
     n_estimators=int(params[0]),
     max_depth=int(params[1]),
@@ -42,6 +55,18 @@ def evaluate_solution(params):
 
 
 def RandomSearch():
+    """
+    Performs a Random Search algorithm to find the best hyperparameters.
+    
+    This function iterates 100 times, generating a random set of hyperparameters 
+    in each iteration using `generate_random_params()`. It evaluates each set 
+    and keeps track of the combination that yields the highest score.
+    
+    Returns:
+        tuple: A tuple containing:
+            - best_parameters (list or dict): The best hyperparameter combination found.
+            - best_score (float): The evaluation score of the best parameters.
+    """
     best_score=None
     best_parameters=None
     for i in range(0,100):
@@ -57,6 +82,20 @@ def RandomSearch():
     return best_parameters, best_score
 
 def gridSearch():
+    """
+    Performs a Grid Search algorithm to optimize Random Forest hyperparameters.
+    
+    This function exhaustively searches through a manually specified subset of the 
+    hyperparameter space. It evaluates combinations of tree count, depth, split 
+    criteria, and feature fractions, while keeping other less impactful parameters fixed 
+    to prevent a combinatorial explosion in execution time. Each combination is built 
+    as a chromosome and evaluated to find the highest performing model.
+    
+    Returns:
+        tuple: A tuple containing:
+            - best_parameters (list): The best hyperparameter chromosome found.
+            - best_score (float): The evaluation score of the best chromosome.
+    """
     best_score = None
     best_parameters = None
     
