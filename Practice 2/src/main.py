@@ -164,6 +164,60 @@ def tournament_selection(population, fitness_scores, k=3):
     return population[best_index].copy()
 
 
+def crossover_two_point(parent1, parent2, crossover_rate=0.8):
+    """
+    Performs a two-point crossover between two parents.
+    
+    Args:
+        parent1 (list): Hyperparameters of the first parent.
+        parent2 (list): Hyperparameters of the second parent.
+        crossover_rate (float): Probability of crossover occurring.
+        
+    Returns:
+        tuple: Two child chromosomes (list, list).
+    """
+    if random.random() < crossover_rate:
+        # 1. Get 2 unique cut points and sort them
+        cut_points = sorted(random.sample(range(1, len(parent1)), 2))
+        pt1 = cut_points[0]
+        pt2 = cut_points[1]
+        
+        # 2. Swap the middle segment to create children
+        child1 = parent1[:pt1] + parent2[pt1:pt2] + parent1[pt2:]
+        child2 = parent2[:pt1] + parent1[pt1:pt2] + parent2[pt2:]
+    else:
+        # No crossover: children are clones
+        child1 = parent1.copy()
+        child2 = parent2.copy()
+        
+    return child1, child2
+
+
+def mutate(child, mutation_rate, gene_space):
+    """
+    Iterates through an individual's genes and mutates them based on a probability.
+    The new mutated value respects the boundaries defined in gene_space.
+    
+    Args:
+        individual (list): The chromosome to be mutated.
+        mutation_rate (float): Probability of mutation per gene (0.0 to 1.0).
+        gene_space (list): List of dictionaries with 'min', 'max', and 'type' rules.
+        
+    Returns:
+        list: The mutated individual.
+    """
+    for index in range(len(child)):
+        if random.random()<mutation_rate:
+            gene_type=gene_space[index]['type']
+            min_val = gene_space[index]['min']
+            max_val = gene_space[index]['max']
+            if gene_type=='int':
+                child[index]=random.randint(min_val,max_val)
+            elif gene_type=='float':
+                child[index] = random.uniform(min_val, max_val)
+    return child
+            
+
 if name == "main":
     # Obtain the current directory of the script to build the path to the dataset
     current_dir = Path(__file__).resolve().parent
