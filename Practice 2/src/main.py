@@ -278,11 +278,11 @@ def genetic_algorithm(pop_size=20, generations=50, crossover_rate=0.8, mutation_
             child1 = mutate(child1, mutation_rate, gene_space)
             child2 = mutate(child2, mutation_rate, gene_space)
             # 7. Add the new children to the next generation
-            new_population.append(child1)
             if len(new_population) < pop_size:
+                new_population.append(child1)
                 new_population.append(child2)
-            # 8. Replace the old population with the new one
-            population = new_population      
+        # 8. Replace the old population with the new one
+        population = new_population      
     return best_individual, best_fitness  
 
 if __name__ == "__main__":
