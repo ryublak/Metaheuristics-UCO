@@ -138,19 +138,19 @@ def evaluate_population(population, fitness_cache=None):
     """
     fitness_scores = []
     
-    # Si no nos pasan un caché, creamos uno temporal vacío
+    # If no cache is provided, create a temporary empty one
     if fitness_cache is None:
         fitness_cache = {}
         
     for individual in population:
-        # Convertimos la lista de parámetros a tupla para usarla de "llave"
+        # Convert the parameter list to a tuple to use it as a dictionary key
         param_key = tuple(individual)
         
-        # Comprobamos si esta configuración idéntica ya fue evaluada antes
+        # Check if this identical configuration was already evaluated
         if param_key in fitness_cache:
             score = fitness_cache[param_key]
         else:
-            # Si es totalmente nueva, evaluamos y la guardamos en caché
+            # If it is completely new, evaluate it and store it in the cache
             score = evaluate_solution(individual)
             fitness_cache[param_key] = score
             
@@ -279,13 +279,13 @@ def genetic_algorithm(pop_size=20, generations=50, elite_size=2):
     epsilon = 0.001
     prev_elite_mean = 0.0
     
-    # Historico (Caché) para no recalcular individuos repetidos (elitismo/clones)
+    # Cache to avoid recalculating fitness for repeated individuals (elitism/clones)
     fitness_cache = {}
     
     for generation in range(generations):
         print(f"Generation {generation+1}/{generations} | Pc: {Pc:.2f} | Pm: {Pm:.2f}")
         
-        # 3. Evaluate the fitness of the current population usando la caché
+        # 3. Evaluate the fitness of the current population using the cache
         fitness_scores = evaluate_population(population, fitness_cache)
         
         # Sort population by fitness to identify the elite
