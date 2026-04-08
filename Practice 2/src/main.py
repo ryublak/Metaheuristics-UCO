@@ -215,26 +215,39 @@ def crossover_two_point(parent1, parent2, crossover_rate=0.8):
 
 def mutate(child, mutation_rate, gene_space):
     """
-    Iterates through an individual's genes and mutates them based on a probability.
-    The new mutated value respects the boundaries defined in gene_space.
+    With a probability of 'mutation_rate', the individual undergoes mutation.
+    When mutated, 1 to 3 random genes are altered to introduce controlled diversity.
     
     Args:
-        individual (list): The chromosome to be mutated.
-        mutation_rate (float): Probability of mutation per gene (0.0 to 1.0).
-        gene_space (list): List of dictionaries with 'min', 'max', and 'type' rules.
+        child (list): The chromosome to be mutated.
+        mutation_rate (float): Probability for the individual to mutate (e.g., 0.2 to 0.9).
+        gene_space (list): Gene space constraints.
         
     Returns:
-        list: The mutated individual.
+        list: The individual (mutated or intact).
     """
-    for index in range(len(child)):
-        if random.random()<mutation_rate:
-            gene_type=gene_space[index]['type']
+    if random.random() < mutation_rate:
+        # Determine number of genes to mutate (1 is highly probable, 3 is rare)
+        prob = random.random()
+        if prob < 0.75:
+            num_mutations = 1   # 75% chance to mutate 1 gene
+        elif prob < 0.95:
+            num_mutations = 2   # 20% chance to mutate 2 genes
+        else:
+            num_mutations = 3   # 5% chance to mutate 3 genes
+            
+        # Select unique genes to mutate concurrently
+        indices_to_mutate = random.sample(range(len(child)), num_mutations)
+        
+        for index in indices_to_mutate:
+            gene_type = gene_space[index]['type']
             min_val = gene_space[index]['min']
             max_val = gene_space[index]['max']
-            if gene_type=='int':
-                child[index]=random.randint(min_val,max_val)
-            elif gene_type=='float':
+            if gene_type == 'int':
+                child[index] = random.randint(min_val, max_val)
+            elif gene_type == 'float':
                 child[index] = random.uniform(min_val, max_val)
+                
     return child
 
 def genetic_algorithm(pop_size=20, generations=50, elite_size=2):
@@ -271,8 +284,8 @@ def genetic_algorithm(pop_size=20, generations=50, elite_size=2):
     best_fitness = None
     
     # Adaptive parameters tracking
-    Pc = 0.5
-    Pm = 0.5
+    Pc = 0.8
+    Pm = 0.2
     delta = 0.05
     stagnation_limit = 5
     stagnation_count = 0
@@ -360,10 +373,11 @@ if __name__ == "__main__":
     X = data.drop("quality", axis=1)
     y = data["quality"]
 
-    if(False):
+    if(True):
         best_random_parameters, best_random_score = RandomSearch()
         best_grid_parameters, best_grid_score = gridSearch()
         print("Best parameters from Random Search:", best_random_parameters, "with accuracy:", best_random_score)
         print("Best parameters from Grid Search:", best_grid_parameters, "with accuracy:", best_grid_score)
-    best_ga_parameters, best_ga_score = genetic_algorithm()
-    print("Best parameters from Genetic Algorithm:", best_ga_parameters, "with accuracy:", best_ga_score)
+    if(False):
+        best_ga_parameters, best_ga_score = genetic_algorithm()
+        print("Best parameters from Genetic Algorithm:", best_ga_parameters, "with accuracy:", best_ga_score)
