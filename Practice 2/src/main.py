@@ -124,19 +124,36 @@ def init_population(pop_size=20):
         
     return population
 
-def evaluate_population(population):
+def evaluate_population(population, fitness_cache=None):
     """
     Evaluates all individuals in the current population.
+    Uses a cache dictionary to avoid re-evaluating known individuals.
     
     Args:
         population (list): The list of individuals (hyperparameter combinations).
+        fitness_cache (dict, optional): Dictionary storing previously calculated fitness scores.
         
     Returns:
         list: A list of fitness scores corresponding to each individual.
     """
-    fitness_scores=[]
-    for i in population:
-        score=evaluate_solution(i)
+    fitness_scores = []
+    
+    # Si no nos pasan un caché, creamos uno temporal vacío
+    if fitness_cache is None:
+        fitness_cache = {}
+        
+    for individual in population:
+        # Convertimos la lista de parámetros a tupla para usarla de "llave"
+        param_key = tuple(individual)
+        
+        # Comprobamos si esta configuración idéntica ya fue evaluada antes
+        if param_key in fitness_cache:
+            score = fitness_cache[param_key]
+        else:
+            # Si es totalmente nueva, evaluamos y la guardamos en caché
+            score = evaluate_solution(individual)
+            fitness_cache[param_key] = score
+            
         fitness_scores.append(score)
         
     return fitness_scores
@@ -220,7 +237,7 @@ def mutate(child, mutation_rate, gene_space):
                 child[index] = random.uniform(min_val, max_val)
     return child
 
-def genetic_algorithm(pop_size=20, generations=50, elite_size=5):
+def genetic_algorithm(pop_size=20, generations=50, elite_size=2):
 
     """
     Main function to run the Genetic Algorithm for hyperparameter optimization.
@@ -262,11 +279,14 @@ def genetic_algorithm(pop_size=20, generations=50, elite_size=5):
     epsilon = 0.001
     prev_elite_mean = 0.0
     
+    # Historico (Caché) para no recalcular individuos repetidos (elitismo/clones)
+    fitness_cache = {}
+    
     for generation in range(generations):
         print(f"Generation {generation+1}/{generations} | Pc: {Pc:.2f} | Pm: {Pm:.2f}")
         
-        # 3. Evaluate the fitness of the current population
-        fitness_scores = evaluate_population(population)
+        # 3. Evaluate the fitness of the current population usando la caché
+        fitness_scores = evaluate_population(population, fitness_cache)
         
         # Sort population by fitness to identify the elite
         pop_with_fitness = list(zip(population, fitness_scores))
@@ -340,9 +360,10 @@ if __name__ == "__main__":
     X = data.drop("quality", axis=1)
     y = data["quality"]
 
-    best_random_parameters, best_random_score = RandomSearch()
-    best_grid_parameters, best_grid_score = gridSearch()
-    print("Best parameters from Random Search:", best_random_parameters, "with accuracy:", best_random_score)
-    print("Best parameters from Grid Search:", best_grid_parameters, "with accuracy:", best_grid_score)
+    if(False):
+        best_random_parameters, best_random_score = RandomSearch()
+        best_grid_parameters, best_grid_score = gridSearch()
+        print("Best parameters from Random Search:", best_random_parameters, "with accuracy:", best_random_score)
+        print("Best parameters from Grid Search:", best_grid_parameters, "with accuracy:", best_grid_score)
     best_ga_parameters, best_ga_score = genetic_algorithm()
     print("Best parameters from Genetic Algorithm:", best_ga_parameters, "with accuracy:", best_ga_score)
