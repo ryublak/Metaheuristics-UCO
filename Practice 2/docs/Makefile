@@ -1,4 +1,4 @@
-# Compilación automática del reporte LaTeX
+# Compilación de los reportes
 DOC_ES=report_es
 DOC_EN=report_en
 

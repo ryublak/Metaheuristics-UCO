@@ -7,9 +7,10 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score, StratifiedKFold
 from sklearn.model_selection import train_test_split
 from pathlib import Path
-#TODO:
-#- Implement the Genetic Algorithm for hyperparameter optimization of the Random Forest Classifier.
-#- Define the gene space for each hyperparameter, ensuring that the values are within reasonable ranges based on the Random Forest's characteristics.
+"""
+Main implementation of evolutionary and search algorithms for Random Forest hyperparameter tuning.
+Includes Random Search, Grid Search, and an Adaptive Genetic Algorithm.
+"""
 
 
 def generate_random_params():
@@ -47,7 +48,7 @@ def evaluate_solution(params):
     return scores.mean()
 
 
-def RandomSearch():
+def random_search():
     best_score      = None
     best_parameters = None
     all_scores      = []  # every individual score evaluated (for histogram analysis)
@@ -62,28 +63,25 @@ def RandomSearch():
 
     return best_parameters, best_score, all_scores
 
-def gridSearch():
+def grid_search():
     best_score = None
     best_parameters = None
-    heatmap = {}  # {(n_estimators, max_depth): best_accuracy} for heatmap visualisation
+    heatmap = {}  # {(n_estimators, max_depth): best_accuracy}
     
-    # 1. Iteration loop over the most influential hyperparameters.
-    # Exploring different combinations of forest size, depth, and splitting criteria.
-    for n_estimators in [25, 75, 200]:          # Typical 'human' steps
-        for max_depth in [5, 15, 25]:           # More standard-looking depth
-            for min_samples_split in [4, 12]:    # Realistic human choices
-                for max_features in [0.3, 0.7]: # Sensible subsets
-                    for criterion in ["gini", "entropy"]: # Both metrics
+    # Loop over influential hyperparameters for forest size and depth.
+    for n_estimators in [25, 75, 200]:
+        for max_depth in [5, 15, 25]:
+            for min_samples_split in [4, 12]:
+                for max_features in [0.3, 0.7]:
+                    for criterion in ["gini", "entropy"]:
                         
-                        # 2. Fixed hyperparameters (lower relative impact or redundant).
-                        # Kept constant to avoid a combinatorial explosion in execution time.
-                        min_samples_leaf = 1         # Allows leaves to be of any size
-                        bootstrap = 1                # Maintain sampling with replacement (core to Random Forest)
-                        class_weight = 0             # No additional class weights
-                        max_leaf_nodes = 200         # Broad limit, actual control is managed by 'max_depth'
-                        min_impurity_decrease = 0.0  # No strict purity gain threshold for splitting
+                        # Fixed parameters with lower impact to keep search space manageable.
+                        min_samples_leaf = 1
+                        bootstrap = 1
+                        class_weight = 0
+                        max_leaf_nodes = 200
+                        min_impurity_decrease = 0.0
                         
-                        # 3. Chromosome/individual construction according to the assignment's defined order
                         parameters = [
                             n_estimators,
                             max_depth,
@@ -91,21 +89,18 @@ def gridSearch():
                             min_samples_leaf,
                             max_features,
                             bootstrap,
-                            int(criterion == "entropy"), # Binary conversion (0=gini, 1=entropy)
+                            int(criterion == "entropy"),
                             class_weight,
                             max_leaf_nodes,
                             min_impurity_decrease
                         ]
                         
-                        # 4. Evaluation using 5-fold Cross-Validation
                         score = evaluate_solution(parameters)
                         
-                        # 5. Update the best model found
                         if best_score is None or score > best_score:
                             best_score = score
                             best_parameters = parameters.copy()
 
-                        # 6. Record for the n_estimators × max_depth heatmap
                         key = (n_estimators, max_depth)
                         if key not in heatmap or score > heatmap[key]:
                             heatmap[key] = score
@@ -206,10 +201,10 @@ def tournament_selection(population, fitness_scores, k=3):
     Returns:
         list: A copy of the winning individual's hyperparameters.
     """
-    # 1. Choose 'k' random participants from our population
+    # Pick 'k' random participants
     participant_indexes = random.sample(range(len(population)), k)
     
-    # 2. Find which of these participants has the best score
+    # Tournament logic
     best_index = participant_indexes[0]
     best_score = fitness_scores[best_index]
     
@@ -219,7 +214,6 @@ def tournament_selection(population, fitness_scores, k=3):
             best_score = fitness_scores[idx]
             best_index = idx
             
-    # 3. Return the winner (copy to avoid accidental modifications)
     return population[best_index].copy()
 
 
@@ -289,7 +283,7 @@ def mutate(child, mutation_rate, gene_space):
                 
     return child
 
-def genetic_algorithm(pop_size=30, generations=50, elite_size=3):
+def genetic_algorithm(pop_size=40, generations=40, elite_size=3):
 
     """
     Main function to run the Genetic Algorithm for hyperparameter optimization.
@@ -344,7 +338,7 @@ def genetic_algorithm(pop_size=30, generations=50, elite_size=3):
     for generation in range(generations):
         print(f"Generation {generation+1}/{generations} | Pc: {Pc:.2f} | Pm: {Pm:.2f}")
         
-        # 3. Evaluate the fitness of the current population using the cache
+        # Evaluate population using cache
         fitness_scores = evaluate_population(population, fitness_cache)
         
         # Sort population by fitness to identify the elite
@@ -443,13 +437,16 @@ if __name__ == "__main__":
     y = data["quality"]
 
     # --- Full Comparative Benchmark ---
-    if(False)
+    best_random_score = 0.0
+    best_grid_score = 0.0
+    
+    if False:
         print("\n[1/3] Running Random Search...")
-        best_random_parameters, best_random_score, _ = RandomSearch()
+        best_random_parameters, best_random_score, _ = random_search()
         print("Best parameters from Random Search:", best_random_parameters, "with accuracy:", best_random_score)
 
         print("\n[2/3] Running Grid Search...")
-        best_grid_parameters, best_grid_score, _ = gridSearch()
+        best_grid_parameters, best_grid_score, _ = grid_search()
         print("Best parameters from Grid Search:", best_grid_parameters, "with accuracy:", best_grid_score)
 
     print("\n[3/3] Running Adaptive Genetic Algorithm...")

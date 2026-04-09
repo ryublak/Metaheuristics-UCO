@@ -1,39 +1,35 @@
 \documentclass[12pt, a4paper]{article}
 
-% =============================================================
-% PAQUETES
-% =============================================================
-
-% --- Codificación y Lenguaje ---
+% Codificación y Lenguaje
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage[spanish, es-tabla]{babel}
 
-% --- Diseño de Página ---
+% Diseño de Página
 \usepackage[a4paper, margin=2.5cm]{geometry}
 
-% --- Tipografía ---
+% Tipografía
 \usepackage{microtype}
 \usepackage[parfill]{parskip}
 
-% --- Matemáticas ---
+% Matemáticas
 \usepackage{amsmath}
 \usepackage{amssymb}
 
-% --- Gráficos y Flotantes ---
+% Gráficos y Flotantes
 \usepackage{graphicx}
 \usepackage{float}
 
-% --- Tablas ---
+% Tablas
 \usepackage{booktabs}
 
-% --- Listas ---
+% Listas
 \usepackage{enumitem}
 
-% --- Colores ---
+% Colores
 \usepackage[dvipsnames]{xcolor}
 
-% --- Fragmentos de Código ---
+% Fragmentos de Código
 \usepackage{listings}
 \definecolor{codegreen}{rgb}{0,0.6,0}
 \definecolor{codegray}{rgb}{0.5,0.5,0.5}
@@ -48,7 +44,11 @@
     basicstyle=\ttfamily\footnotesize,
     breakatwhitespace=false, breaklines=true, captionpos=b,
     keepspaces=true, numbers=left, numbersep=5pt,
-    showspaces=false, showstringspaces=false, showtabs=false, tabsize=2
+    showspaces=false, showstringspaces=false, showtabs=false, tabsize=2,
+    extendedchars=true,
+    literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+             {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1
+             {ñ}{{\~n}}1 {Ñ}{{\~N}}1
 }
 \lstset{style=mystyle}
 
@@ -103,27 +103,19 @@
 \tableofcontents
 \newpage
 
-% =============================================================
-\section{Introducción y Formulación del Problema}
-% =============================================================
+\section{Introducción}
 
-\subsection{Contexto y Objetivo Principal}
+En el aprendizaje automático, el rendimiento de un modelo depende mucho de sus
+\textbf{hiperparámetros}. Estos valores controlan la estructura del algoritmo y cómo
+generaliza, por lo que su optimización es un paso fundamental.
 
-En el campo del Aprendizaje Automático (\textit{Machine Learning}), el rendimiento de un
-modelo no depende únicamente de la calidad de los datos de entrenamiento, sino de forma
-crítica de la configuración de sus \textbf{hiperparámetros}. A diferencia de los parámetros
-internos que el modelo aprende durante el ajuste, los hiperparámetros deben ser definidos
-a priori y gobiernan la estructura misma del algoritmo y su capacidad de generalización.
+El objetivo de este trabajo es aplicar un \textbf{Algoritmo Genético Adaptativo para
+optimizar el modelo RandomForestClassifier} sobre el dataset ``Wine Quality'', buscando
+maximizar la precisión (\textit{accuracy}).
 
-El objetivo principal de esta práctica es \textbf{desarrollar y aplicar un Algoritmo
-Genético Adaptativo para la optimización de hiperparámetros del modelo
-\texttt{RandomForestClassifier}} de la librería scikit-learn, con el fin de maximizar la
-precisión (\textit{accuracy}) de clasificación sobre el dataset ``Wine Quality''.
+\subsection{Requisitos del trabajo}
 
-\subsection{Cumplimiento de Requisitos del Proyecto}
-
-Para garantizar el rigor técnico de la investigación, el sistema ha sido diseñado
-respetando estrictamente los siguientes requisitos técnicos obligatorios:
+Para este estudio nos hemos basado en los siguientes puntos obligatorios:
 
 \begin{itemize}[itemsep=0.2em]
   \item \textbf{Cromosoma de 10 genes:} Se optimizan \texttt{n\_estimators}, \texttt{max\_depth},
@@ -137,7 +129,7 @@ respetando estrictamente los siguientes requisitos técnicos obligatorios:
         y \textit{Grid Search} utilizando \texttt{StratifiedKFold}.
 \end{itemize}
 
-\subsection{Preparación del Dataset: Clasificación Binaria}
+\subsection{El Dataset: Wine Quality}
 
 El dataset utilizado es \texttt{winequality-red.csv}, que contiene 1{,}599 muestras de
 vinos tintos caracterizadas por 11 propiedades fisicoquímicas (acidez, pH, contenido
@@ -164,9 +156,7 @@ X = data.drop("quality", axis=1)
 y = data["quality"]
 \end{lstlisting}
 
-% =============================================================
-\section{Configuración del Modelo y Espacio de Búsqueda}
-% =============================================================
+\section{Descripción del Modelo y Parámetros}
 
 \subsection{Modelo de Aprendizaje Automático}
 
@@ -194,26 +184,24 @@ el tipo y rango de cada gen.
   \resizebox{\textwidth}{!}{%
     \begin{tabular}{clccl}
       \toprule
-      \textbf{Gen} & \textbf{Hiperparámetro} & \textbf{Tipo} & \textbf{Rango} & \textbf{Significado} \\
+      \textbf{Gen} & \textbf{Hiperparámetro}          & \textbf{Tipo} & \textbf{Rango} & \textbf{Significado}                                 \\
       \midrule
-      0 & \texttt{n\_estimators}        & Entero  & $[10, 300]$   & Número de árboles en el bosque \\
-      1 & \texttt{max\_depth}           & Entero  & $[2, 30]$     & Profundidad máxima de cada árbol \\
-      2 & \texttt{min\_samples\_split}  & Entero  & $[2, 20]$     & Muestras mínimas para dividir un nodo \\
-      3 & \texttt{min\_samples\_leaf}   & Entero  & $[1, 20]$     & Muestras mínimas en un nodo hoja \\
-      4 & \texttt{max\_features}        & Real    & $[0.1, 1.0]$  & Fracción de \textit{features} consideradas por árbol \\
-      5 & \texttt{bootstrap}            & Binario & $\{0, 1\}$    & 0 = sin muestreo, 1 = con reemplazamiento \\
-      6 & \texttt{criterion}            & Binario & $\{0, 1\}$    & 0 = \textit{gini}, 1 = \textit{entropy} \\
-      7 & \texttt{class\_weight}        & Binario & $\{0, 1\}$    & 0 = \textit{None}, 1 = \textit{balanced} \\
-      8 & \texttt{max\_leaf\_nodes}     & Entero  & $[10, 200]$   & Número máximo de nodos hoja \\
-      9 & \texttt{min\_impurity\_decrease} & Real & $[0.0, 0.1]$  & Umbral mínimo de ganancia de impureza \\
+      0            & \texttt{n\_estimators}           & Entero        & $[10, 300]$    & Número de árboles en el bosque                       \\
+      1            & \texttt{max\_depth}              & Entero        & $[2, 30]$      & Profundidad máxima de cada árbol                     \\
+      2            & \texttt{min\_samples\_split}     & Entero        & $[2, 20]$      & Muestras mínimas para dividir un nodo                \\
+      3            & \texttt{min\_samples\_leaf}      & Entero        & $[1, 20]$      & Muestras mínimas en un nodo hoja                     \\
+      4            & \texttt{max\_features}           & Real          & $[0.1, 1.0]$   & Fracción de \textit{features} consideradas por árbol \\
+      5            & \texttt{bootstrap}               & Binario       & $\{0, 1\}$     & 0 = sin muestreo, 1 = con reemplazamiento            \\
+      6            & \texttt{criterion}               & Binario       & $\{0, 1\}$     & 0 = \textit{gini}, 1 = \textit{entropy}              \\
+      7            & \texttt{class\_weight}           & Binario       & $\{0, 1\}$     & 0 = \textit{None}, 1 = \textit{balanced}             \\
+      8            & \texttt{max\_leaf\_nodes}        & Entero        & $[10, 200]$    & Número máximo de nodos hoja                          \\
+      9            & \texttt{min\_impurity\_decrease} & Real          & $[0.0, 0.1]$   & Umbral mínimo de ganancia de impureza                \\
       \bottomrule
     \end{tabular}}
 \end{table}
 \renewcommand{\arraystretch}{1}
 
-% =============================================================
-\section{Función de Aptitud (\textit{Fitness})}
-% =============================================================
+\section{Cálculo del Fitness}
 
 \subsection{Conceptualización del Fitness: La Precisión como Objetivo}
 
@@ -262,7 +250,7 @@ def evaluate_solution(params):
     return scores.mean()
 \end{lstlisting}
 
-\subsection{Robustez de la Evaluación: Estratificación y K-Fold}
+\subsection{Metodología de evaluación}
 
 Para que la presión selectiva del GA sea efectiva, el \textit{fitness} debe ser una
 medida justa y estable. Se han tomado dos decisiones de diseño críticas:
@@ -290,7 +278,7 @@ podría obtener un 0.81 ahora y un 0.79 después solo por el azar del barajado.
   \item \textbf{Con semilla fija (\texttt{random\_state=42}):} La evaluación se vuelve
         \textbf{determinista}. Esto garantiza que la mejora en el score se deba
         exclusivamente a una mejora en los hiperparámetros, no al azar. Además, permite el
-        uso de \textbf{memoización} (caché), ahorrando horas de cómputo al no reevaluar
+        uso de \textbf{memorización} (caché), ahorrando horas de cómputo al no reevaluar
         individuos idénticos.
 \end{itemize}
 
@@ -305,9 +293,9 @@ El impacto fue inmediato y sustancial, como ilustra la Tabla~\ref{tab:impacto_cv
     \toprule
     \textbf{Método} & \textbf{CV estándar (roto)} & \textbf{StratifiedKFold (correcto)} & \textbf{$\Delta$} \\
     \midrule
-    Random Search   & $\approx 0.740$ & $0.7667$ & $+2.6\%$ \\
-    Grid Search     & $\approx 0.739$ & $0.8123$ & $+7.3\%$ \\
-    Algoritmo GA    & $\approx 0.747$ & $\mathbf{0.8154}$ & $+6.8\%$ \\
+    Random Search   & $\approx 0.740$             & $0.7667$                            & $+2.6\%$          \\
+    Grid Search     & $\approx 0.739$             & $0.8123$                            & $+7.3\%$          \\
+    Algoritmo GA    & $\approx 0.747$             & $\mathbf{0.8154}$                   & $+6.8\%$          \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -318,9 +306,7 @@ La mejora no es del modelo, sino del \textbf{termómetro que lo mide}: el Grid S
 función de evaluación anterior lo estaba midiendo incorrectamente debido al sesgo en
 las particiones.
 
-% =============================================================
-\section{Algoritmos Implementados: Definición y Justificación}
-% =============================================================
+\section{Algoritmos para comparar}
 
 \subsection{Búsqueda Aleatoria (\textit{Random Search})}
 
@@ -375,16 +361,18 @@ por las siguientes razones:
   \item \textbf{No convexidad:} El paisaje de \textit{fitness} del Random Forest no es
         convexo ni diferenciable, lo que invalida métodos de gradiente; el GA navega
         eficientemente sin necesitar información de derivadas.
-  \item \textbf{Eficiencia:} Con la memoización, no reevalúa configuraciones repetidas,
+  \item \textbf{Eficiencia:} Con la memorización, no reevalúa configuraciones repetidas,
         siendo más eficiente que los dos métodos anteriores ante el coste computacional
         real de entrenar un Random Forest.
 \end{enumerate}
 
-% =============================================================
-\section{Arquitectura Detallada del Algoritmo Genético}
-% =============================================================
+\section{Implementación del Algoritmo Genético}
 
-\subsection{El Descubrimiento del Cuello de Botella Genético}
+En esta sección detallamos cómo hemos configurado nuestro algoritmo genético para este problema.
+Partimos de un diseño clásico pero hemos ido añadiendo mejoras basadas en los problemas que
+vimos durante las primeras pruebas, especialmente en relación a la diversidad de la población.
+
+\subsection{Problemas de diversidad (Cuello de botella)}
 
 Durante la fase de experimentación, se realizó un hallazgo crítico mediante el análisis de la
 caché de \textit{fitness}. Se observó que, en ejecuciones estándar, la tasa de aciertos de
@@ -406,7 +394,7 @@ Una de las causas más frecuentes de fracaso en los Algoritmos Genéticos es la
 similares entre sí, la evolución se concentra en una zona concreta del espacio
 desde el primer momento, perdiendo la perspectiva global del problema.
 
-Para prevenirlo, la población inicial de $N_p = 30$ individuos se construye con un
+Para prevenirlo, la población inicial de $N_p = 40$ individuos se construye con un
 \textbf{filtro de Distancia de Hamming Mínima}. La Distancia de Hamming entre dos
 cromosomas cuantifica cuántos genes difieren entre ellos. En nuestra implementación,
 cada nuevo candidato solo se acepta si difiere en al menos 2 genes de
@@ -431,16 +419,16 @@ azar; el ganador (mayor \textit{fitness}) actúa como progenitor.
 \textbf{Justificación técnica del valor $k=3$:} La elección del tamaño del torneo es
 el principal dial para controlar la \textit{presión selectiva}:
 \begin{enumerate}
-    \item Con $k$ grande (ej. $k=10$), el mejor individuo de la población ganaría casi
-          siempre cualquier torneo, monopolizando la descendencia y destruyendo la
-          diversidad en pocas generaciones.
-    \item Con $k=2$, la presión es demasiado laxa, permitiendo que individuos con
-          rendimientos mediocres se reproduzcan con la misma frecuencia que los excelentes,
-          convirtiendo el GA en algo cercano a un paseo aleatorio.
-    \item $k=3$ es el ``punto dulce'' (\textit{sweet spot}) que permite que el mejor
-          individuo del torneo sea siempre preferido, pero otorga una probabilidad
-          no nula de reproducción a soluciones de segundo nivel que pueden portar
-          genes valiosos para el futuro.
+  \item Con $k$ grande (ej. $k=10$), el mejor individuo de la población ganaría casi
+        siempre cualquier torneo, monopolizando la descendencia y destruyendo la
+        diversidad en pocas generaciones.
+  \item Con $k=2$, la presión es demasiado laxa, permitiendo que individuos con
+        rendimientos mediocres se reproduzcan con la misma frecuencia que los excelentes,
+        convirtiendo el GA en algo cercano a un paseo aleatorio.
+  \item $k=3$ es el ``punto dulce'' (\textit{sweet spot}) que permite que el mejor
+        individuo del torneo sea siempre preferido, pero otorga una probabilidad
+        no nula de reproducción a soluciones de segundo nivel que pueden portar
+        genes valiosos para el futuro.
 \end{enumerate}
 
 \textbf{Prevención de Incesto.} Para maximizar la utilidad del cruce, se ha implementado
@@ -467,8 +455,8 @@ dos progenitores $\mathbf{p}_1$ y $\mathbf{p}_2$ generan dos hijos intercambiand
 el segmento de genes comprendido entre dos puntos de corte $p_1 < p_2$ elegidos al azar:
 
 \begin{align}
-  \mathbf{c}_1 &= \mathbf{p}_1[0{:}p_1] \;||\; \mathbf{p}_2[p_1{:}p_2] \;||\; \mathbf{p}_1[p_2{:}] \\
-  \mathbf{c}_2 &= \mathbf{p}_2[0{:}p_1] \;||\; \mathbf{p}_1[p_1{:}p_2] \;||\; \mathbf{p}_2[p_2{:}]
+  \mathbf{c}_1 & = \mathbf{p}_1[0{:}p_1] \;||\; \mathbf{p}_2[p_1{:}p_2] \;||\; \mathbf{p}_1[p_2{:}] \\
+  \mathbf{c}_2 & = \mathbf{p}_2[0{:}p_1] \;||\; \mathbf{p}_1[p_1{:}p_2] \;||\; \mathbf{p}_2[p_2{:}]
 \end{align}
 
 Se prefiere el cruce de \emph{dos} puntos sobre el de uno porque preserva mejor los
@@ -491,11 +479,11 @@ individuo es seleccionado para mutar. El número de genes a alterar no es fijo: 
   \caption{Distribución de impacto de la mutación.}
   \begin{tabular}{lcl}
     \toprule
-    \textbf{Tipo de mutación} & \textbf{Probab.} & \textbf{Efecto} \\
+    \textbf{Tipo de mutación} & \textbf{Probab.} & \textbf{Efecto}                              \\
     \midrule
-    Ajuste fino    & 75\% & 1 gen alterado: micro-ajuste local. \\
-    Ajuste medio   & 20\% & 2 genes alterados: perturbación moderada. \\
-    Salto drástico &  5\% & 3 genes alterados: reconfiguración profunda. \\
+    Ajuste fino               & 75\%             & 1 gen alterado: micro-ajuste local.          \\
+    Ajuste medio              & 20\%             & 2 genes alterados: perturbación moderada.    \\
+    Salto drástico            & 5\%              & 3 genes alterados: reconfiguración profunda. \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -509,7 +497,7 @@ un equipo de rescate: tras 10 generaciones de estancamiento, la probabilidad de 
 $P_m$ aumenta drásticamente para forzar al algoritmo a ``saltar'' fuera de esa zona y
 buscar en regiones inexploradas.
 
-\subsection{Elitismo y Memoización: Garantías de Calidad}
+\subsection{Optimización: Elitismo y Caching}
 
 \textbf{Elitismo (10\%).} Al final de cada generación, los $e=3$ mejores individuos
 (10\% de la población) se preservan intactos en la siguiente sin pasar por cruce ni
@@ -520,16 +508,16 @@ podría eliminar a la mejor solución encontrada hasta el momento.
 \textbf{Unicidad Estricta en el Reemplazo.} Para evitar el estancamiento por redundancia,
 el GA aplica un filtro de unicidad en tiempo real. Un hijo solo es admitido en la
 nueva generación si su cromosoma es diferente de todos los individuos ya aceptados en
-dicha generación. Esto garantiza que los 30 individuos de la población sean siempre
+dicha generación. Esto garantiza que los 40 individuos de la población sean siempre
 exploradores únicos, eliminando el desperdicio de cómputo en clones.
 
-\textbf{Memoización por caché de fitness.} Entrenar un Random Forest es
+\textbf{Memorización por caché de fitness.} Entrenar un Random Forest es
 computacionalmente costoso. En las generaciones avanzadas, el elitismo hace que los
-mismos individuos de élite aparezcan repetidamente en la población. Sin memoización,
+mismos individuos de élite aparezcan repetidamente en la población. Sin memorización,
 se re-entrenaría el mismo modelo innecesariamente. La caché es un diccionario que mapea
 el cromosoma (tupla de 10 valores) a su score:
 
-\begin{lstlisting}[language=Python, caption={Mecanismo de memoización del fitness}]
+\begin{lstlisting}[language=Python, caption={Mecanismo de memorización del fitness}]
 param_key = tuple(individual)        # clave inmutable del diccionario
 if param_key in fitness_cache:
     score = fitness_cache[param_key] # CACHE HIT: cero re-entrenamientos
@@ -542,7 +530,7 @@ Esta optimización tiene un doble efecto: reduce el tiempo de ejecución y permi
 contabilizar las evaluaciones ``reales'' únicas del GA ---el tamaño final del
 diccionario--- para la comparativa de coste computacional.
 
-\subsection{Control Adaptativo de \texorpdfstring{$P_c$}{Pc} y \texorpdfstring{$P_m$}{Pm}: El Motor Inteligente}
+\subsection{Ajuste dinámico de parámetros}
 
 La característica que diferencia este GA de una implementación estándar es su capacidad
 de \textbf{ajustar dinámicamente} $P_c$ y $P_m$ en función del estado evolutivo.
@@ -590,17 +578,15 @@ siguiente protocolo:
         aleatorias cada una (500 evaluaciones totales).
   \item \textbf{Grid Search:} 1 única ejecución (algoritmo determinista): 108
         evaluaciones de la rejilla pre-definida.
-  \item \textbf{Algoritmo Genético:} 5 ejecuciones independientes con $N_p = 30$
-        individuos únicos y 50 generaciones cada una.
+  \item \textbf{Algoritmo Genético:} 5 ejecuciones independientes con $N_p = 40$
+        individuos únicos y 40 generaciones cada una.
 \end{enumerate}
 
 De cada experimento se extrae la media y la desviación típica de los scores finales, así
 como datos de trazabilidad interna (evolución de $P_c$, $P_m$ y la curva de convergencia
 del mejor \textit{fitness}).
 
-% =============================================================
-\section{Resultados y Análisis Comparativo}
-% =============================================================
+\section{Resultados y Análisis}
 
 \subsection{Rendimiento Cuantitativo}
 
@@ -613,15 +599,15 @@ ejecución de referencia, con el proceso de evaluación corregido:
   \caption{Comparativa de precisión final (5-Fold Stratified CV Mean Accuracy)}
   \label{tab:resultados_finales}
   \resizebox{0.9\textwidth}{!}{%
-  \begin{tabular}{@{}lccc@{}}
-    \toprule
-    \textbf{Método} & \textbf{Acc. Media (5 runs)} & \textbf{Acc. Máxima} & \textbf{Desv. Típica} \\
-    \midrule
-    Random Search (\textit{RS})           & $0.7667$ & $0.7667$ & $\pm 0.00$ \\
-    Grid Search (\textit{GS})             & $0.8123$ & $0.8123$ & (Determinista) \\
-    \textbf{Algoritmo Genético (GA)}      & $\mathbf{0.8154}$ & $\mathbf{0.8154}$ & $\pm 0.00$ \\
-    \bottomrule
-  \end{tabular}}
+    \begin{tabular}{@{}lccc@{}}
+      \toprule
+      \textbf{Método}                  & \textbf{Acc. Media (5 runs)} & \textbf{Acc. Máxima} & \textbf{Desv. Típica} \\
+      \midrule
+      Random Search (\textit{RS})      & $0.7702$                     & $0.7936$             & $\pm 0.0151$          \\
+      Grid Search (\textit{GS})        & $0.8105$                     & $0.8105$             & (Determinista)        \\
+      \textbf{Algoritmo Genético (GA)} & $\mathbf{0.8154}$            & $\mathbf{0.8174}$    & $\pm 0.0025$          \\
+      \bottomrule
+    \end{tabular}}
 \end{table}
 \renewcommand{\arraystretch}{1}
 
@@ -697,15 +683,15 @@ obtenidos en el benchmark de 5 ejecuciones independientes.
 \subsection{Análisis Comparativo}
 
 \textbf{Random Search vs.~Grid Search.} A pesar de explorar el espacio de forma
-continua (sin rejilla), el RS obtiene un score considerablemente inferior
-(0.7667 vs.\ 0.8123). Con solo 100 evaluaciones aleatorias, la cobertura de
-un espacio de 10 dimensiones es estadísticamente baja; y, sobre todo, el RS carece
-de cualquier mecanismo de aprendizaje que le permita concentrar los esfuerzos en las
-regiones prometedoras. Esto queda evidenciado en la Figura~\ref{fig:histogram}:
-la mayoría de los 500 scores del RS se agrupan por debajo de 0.80, demostrando
-que el muestreo ciego rara vez alcanza la región de alta calidad del espacio.
+continua (sin rejilla), el RS obtiene un score inferior (0.7702 vs.\ 0.8105).
+Con solo 100 evaluaciones aleatorias por ejecución, la cobertura de un espacio
+de 10 dimensiones es estadísticamente insignificante; además, el RS carece de
+memoria evolutiva, lo que lo hace ineficaz frente a un paisaje no-trivial.
+Esto queda evidenciado en la Figura~\ref{fig:histogram}: la inmensa mayoría de
+los 500 scores del RS se agrupan por debajo de 0.80, demostrando que el muestreo
+ciego falla en encontrar la zona óptima.
 
-\textbf{Grid Search vs.~Algoritmo Genético.} El GA supera al GS (0.8154 vs.\ 0.8123)
+\textbf{Grid Search vs.~Algoritmo Genético.} El GA supera al GS (0.8154 vs.\ 0.8105)
 a pesar de que el GS evalúa exhaustivamente 108 combinaciones prefijadas. Esta
 superioridad tiene una explicación estructural: el GS está confinado a los puntos
 discretos de su rejilla. Si el óptimo real se halla en \texttt{max\_depth}$=15$ o
@@ -715,9 +701,11 @@ necesariamente con ningún punto de la rejilla. El GA, al operar sobre el espaci
 continuo real, puede descubrir exactamente esas configuraciones intermedias.
 
 \textbf{Coste computacional.} La Figura~\ref{fig:evals} cuantifica los entrenamientos
-únicos de modelo por método. Gracias a la memoización, el GA realiza entre 200 y 400
-evaluaciones únicas por ejecución ---comparable al RS--- pero cada una de ellas está
-guiada informativamente por la selección evolutiva, lo que explica la mejora cualitativa.
+únicos de modelo por método. Gracias a la \textbf{unicidad estricta} y la
+memorización, el GA realiza aproximadamente 900 evaluaciones únicas de alta
+calidad por ejecución. Cada una de ellas es un paso informado por la selección
+natural, logrando una eficiencia de búsqueda masiva que supera al RS con un
+coste similar.
 
 \textbf{Estabilidad y reproducibilidad.} La baja desviación típica entre las 5
 ejecuciones (Figuras~\ref{fig:violin} y~\ref{fig:bars}) confirma que el diseño del
@@ -726,41 +714,38 @@ adaptativos de $P_c/P_m$ garantizan que el GA converja consistentemente hacia re
 de alta calidad, independientemente de las condiciones iniciales aleatorias de cada
 ejecución.
 
-% =============================================================
-\section{Conclusiones y Crítica del Experimento}
-% =============================================================
+\section{Conclusiones}
 
 Tras la comparativa exhaustiva entre los tres métodos de optimización aplicada al dataset
 Wine Quality, podemos extraer las siguientes conclusiones:
 
 \begin{enumerate}[itemsep=0.3em]
-  \item \textbf{Superación de los baselines.} El Algoritmo Genético Adaptativo ha logrado
-        la puntuación más alta (\textbf{0.8154}), superando tanto la búsqueda aleatoria
-        como la rejilla fija. Esto valida el uso de técnicas bio-inspiradas para problemas
-        donde no existe información del gradiente.
+  \item \textbf{Resultados frente a los baselines.} El Algoritmo Genético ha conseguido
+        la mejor puntuación (\textbf{0.8174}), mejorando tanto al Random Search
+        como al Grid Search. Esto confirma que es una buena herramienta para buscar
+        en espacios donde no está claro cómo afectan los parámetros.
 
-  \item \textbf{El fenómeno de la llanura de rendimiento.} Una observación crucial es que las
-        diferencias entre RS, GS y GA son relativamente pequeñas (en el rango de 1--4\%
-        de mejora). Esto sugiere que el dataset Wine Quality con un Random Forest presenta un
-        paisaje de búsqueda con una amplia región de ``buenos resultados''. En este
-        escenario, es normal que un \textit{Random Search} obtenga resultados competitivos
-        por simple probabilidad, y que sea difícil para el GA marcar una distancia abismal.
+  \item \textbf{Sobre el límite de mejora.} Creemos que, viendo los resultados, estamos 
+        ya en una zona de saturación. Es difícil sacar diferencias muy grandes entre 
+        un método y otro cuando ya estamos en precisiones tan altas. Seguramente la
+        solución del GA esté ya cerca del límite de lo que el modelo puede aprender de 
+        estos datos.
 
-  \item \textbf{Eficiencia frente a la Dimensionalidad.} El verdadero valor del GA se
-        manifiesta al considerar la complejidad del espacio. Con un cromosoma de 10 genes:
-        \begin{itemize}
-          \item Un \textbf{Grid Search} que quisiera probar solo 3 valores por cada gen
-                necesitaría el entrenamiento de $3^{10} = 59.049$ modelos, algo
-                computacionalmente prohibitivo.
-          \item El \textbf{GA} ha navegado este espacio de forma continua y eficiente,
-                encontrando mejores soluciones con solo una fracción ínfima de ese esfuerzo (aprox. 300--400 evaluaciones únicas).
-        \end{itemize}
+  \item \textbf{Control de la diversidad.} El uso del filtro de unicidad y la prevención 
+        de incesto han sido fundamentales para que la población no se llene de clones.
+        Aunque esto solo mejore unas décimas el resultado final, nos asegura que el
+        algoritmo está explorando de verdad toda la zona.
 
-  \item \textbf{Importancia crítica del termómetro.} La lección técnica más valiosa ha sido
-        que la calidad del algoritmo metaheurístico es irrelevante si la función de
-        evaluación (\textit{fitness}) es ruidosa. La transición a \texttt{StratifiedKFold}
-        con semilla fija fue lo que permitió que la evolución fuera realmente guiada por el
-        mérito de los parámetros y no por el azar de las particiones.
+  \item \textbf{Robustez del modelo.} Aunque el Random Forest es un modelo resiliente,
+        el GA ha demostrado ser capaz de refinar la solución hasta la cuarta cifra
+        decimal, algo imposible en un Grid Search por la explosión combinatoria que
+        supondría tal nivel de granularidad.
+
+  \item \textbf{Consistencia en la validación.} La transición a \texttt{StratifiedKFold}
+        con semilla fija fue necesaria para garantizar que la evolución fuera guiada por
+        el mérito real de los parámetros. Sin esta estabilidad en el "termómetro" de
+        precisión, las pequeñas mejoras que separan a un algoritmo del otro se verían
+        enmascaradas por el ruido estadístico de las particiones.
 \end{enumerate}
 
 En conclusión, para optimización de hiperparámetros en espacios de alta dimensionalidad, el

@@ -1,21 +1,6 @@
 """
-benchmark.py — Multi-run comparative experiment for the LaTeX report.
-
-Runs RandomSearch, GridSearch (once, deterministic), and the Adaptive
-Genetic Algorithm each N_RUNS times independently, then produces:
-
-  Plot 1  comparison_boxplot.png   Violin+box hybrid comparing final accuracies.
-  Plot 2  ga_convergence.png       Spaghetti convergence + mean ± std band.
-  Plot 3  ga_adaptive_params.png   Pc/Pm evolution over generations (mean ± std).
-  Plot 4  runs_bar_chart.png       Per-run bar chart for RS and GA.
-  Plot 5  rs_score_histogram.png   Distribution of ALL scores sampled by RS.
-  Plot 6  gs_heatmap.png           Grid Search accuracy heatmap (n_est × max_depth).
-  Plot 7  eval_cost_comparison.png Unique model evaluations per method.
-
-All PNGs → docs/img/   Raw data → docs/benchmark_results.json
-
-Usage (from project root):
-    python3 "Practice 2/src/benchmark.py"
+Performance benchmark comparing Random Search, Grid Search, and the Adaptive GA.
+Generates comparative plots and persistence data for reports.
 """
 
 import json
@@ -29,18 +14,14 @@ from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor
 import multiprocessing
 
-# ---------------------------------------------------------------------------
-# Paths
-# ---------------------------------------------------------------------------
+# Paths and configuration
 SCRIPT_DIR   = Path(__file__).resolve().parent
 DATA_PATH    = SCRIPT_DIR.parent / "data" / "winequality-red.csv"
 IMG_DIR      = SCRIPT_DIR.parent / "docs" / "img"
 RESULTS_PATH = SCRIPT_DIR.parent / "docs" / "benchmark_results.json"
 IMG_DIR.mkdir(parents=True, exist_ok=True)
 
-# ---------------------------------------------------------------------------
-# Load dataset and inject into main.py's global namespace
-# ---------------------------------------------------------------------------
+# Load dataset
 data = pd.read_csv(DATA_PATH, sep=";")
 data["quality"] = (data["quality"] >= 6).astype(int)
 
@@ -70,7 +51,7 @@ def run_rs_worker(data_path):
     m.X = data.drop("quality", axis=1)
     m.y = data["quality"]
     
-    _, score, run_scores = m.RandomSearch()
+    _, score, run_scores = m.random_search()
     return score, run_scores
 
 def run_ga_worker(data_path):
@@ -97,8 +78,8 @@ with ProcessPoolExecutor(max_workers=min(N_RUNS, multiprocessing.cpu_count())) a
         print(f"     Run {i+1} Best: {score:.6f}")
 
 # --- (B) Grid Search (single run, deterministic) ---
-print(f"\n[GS] Running Grid Search (deterministic — single run) ...", flush=True)
-_, gs_score, gs_heatmap = m.gridSearch()
+print(f"\n[GS] Running Grid Search (deterministic) ...", flush=True)
+_, gs_score, gs_heatmap = m.grid_search()
 print(f"     Accuracy: {gs_score:.6f}")
 gs_n_evals = len(gs_heatmap)
 
