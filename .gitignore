@@ -8,3 +8,25 @@ wheels/
 
 # Virtual environments (uv)
 **/.venv/
+
+# LaTeX temporary files
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.pdfsync
+*.bak
+*.sav
+*.auxlock
+*.bbl
+*.blg
+*.run.xml
+*.bcf
+
+# Windows metadata (WSL/Shared drives)
+*:Zone.Identifier
