@@ -258,6 +258,12 @@ This \textbf{mandatory preprocessing step}:
 Talks for which $V(t) = \varnothing$ are inherently infeasible; such genes are set to
 $-1$ and are never modified by crossover or mutation.
 
+In the instance generator, a post-processing step ensures every educational level
+has at least $\lceil T / 7.5\rceil$ researchers. For $T = 30$, this means each
+of the five levels receives at least 4 researchers, preventing the structural
+infeasibility that would arise if a level had more talk requests than its
+researchers could cover.
+
 \begin{lstlisting}[language=Python, caption={Preprocessing: building the valid researchers dictionary}]
 def build_valid_researchers_per_talk(talks, researchers, schools):
     valid = {}
@@ -524,32 +530,48 @@ a child could end up with that researcher assigned to more talks than their
 \end{enumerate}
 
 This repair is applied immediately after crossover and also during cataclysmic
-restart. It keeps the population close to the feasible region without slowing
-down the search.
+restart. Reassigning an excess talk may create a new overallocation for the
+receiving researcher, so the two phases are repeated until the chromosome
+is fully consistent (up to 10 iterations). This cascade resolution keeps the
+population close to the feasible region without slowing down the search.
 
-\begin{lstlisting}[language=Python, caption={Repair operator — two phases}]
+\begin{lstlisting}[language=Python, caption={Iterative repair operator}]
 def repair_chromosome(chromosome, researcher_ids, researchers, valid_map):
     chrom = copy.copy(chromosome)
-
-    # Phase 1: fix overallocation
-    counts = {}
-    for pos, r_idx in enumerate(chrom):
-        if r_idx != -1:
-            counts[researcher_ids[r_idx]] = counts.get(..., 0) + 1
-    for r_str, count in counts.items():
-        if count > researchers[r_str].max_talks:
-            # reassign excess talks to other valid researchers
-            ...
-
-    # Phase 2: fill unassigned positions if possible
-    for pos, r_idx in enumerate(chrom):
-        if r_idx == -1:
-            for r_str in valid_map[pos]:
-                if usage.get(r_str, 0) < researchers[r_str].max_talks:
-                    chrom[pos] = researcher_ids.index(r_str)
-                    break
+    for iteration in range(10):
+        changed = False
+        # Phase 1: fix overallocation
+        counts = {}
+        for pos, r_idx in enumerate(chrom):
+            if r_idx != -1:
+                counts[researcher_ids[r_idx]] = counts.get(..., 0) + 1
+        for r_str, count in counts.items():
+            if count > researchers[r_str].max_talks:
+                # reassign excess talks to other valid researchers
+                ...; changed = True
+        # Phase 2: fill unassigned positions if possible
+        for pos, r_idx in enumerate(chrom):
+            if r_idx == -1:
+                for r_str in valid_map[pos]:
+                    if usage.get(r_str, 0) < researchers[r_str].max_talks:
+                        chrom[pos] = researcher_ids.index(r_str)
+                        changed = True; break
+        if not changed:
+            break
     return chrom
 \end{lstlisting}
+
+\subsection{Final Solution Guarantee}
+
+After the CHC loop finishes, the best chromosome could theoretically carry
+a remaining overallocation if the valid map is so sparse that no alternative
+researchers exist. To prevent this, a \textbf{forced desasignation} is applied
+as a final post-processing step: any researcher assigned to more talks than
+their \texttt{maxTalks} has the excess talks set to $-1$ (unassigned). This
+guarantees that the delivered solution never carries a hard penalty of
+$10^6$, at the cost of a few extra unassigned talks whose individual penalty
+is only 10. The same cleanup is applied to the elite set, so all displayed
+alternatives are free of hard violations and directly comparable.
 
 \subsection{Elite Set}
 
@@ -690,6 +712,11 @@ consecutive restarts fail to discover better solutions, the rate
 increases automatically, making each restart more disruptive until a
 new improvement is found.
 
+The population size and number of generations scale with the instance:
+$N_p = \max(200,\; 5T)$ and $G = \max(500,\; 20T)$. For the default
+generated instance ($T = 30$) this gives $N_p = 200$ and $G = 600$,
+producing run times of 5--30 seconds on consumer hardware.
+
 % ============================================================
 \section{Conclusions}
 % ============================================================
@@ -715,11 +742,15 @@ feasibly cover each talk — by filtering on topic, level, and travel.
 This makes both initialisation and fitness evaluation faster, and lets
 infeasible talks stay as $-1$ without wasting search effort.
 
-The algorithm returns a \textbf{complete elite set} of the top unique
-solutions found, displayed to the user as ranked alternatives. On a
-synthetic instance with $T=18$, $E=5$, and $R=30$, the averaged
-convergence over several runs starts from a soft-constraint penalty
-of around 2890 and settles at roughly 1300, showing steady improvement
-over 150 generations with regular cataclysmic restarts.
+The algorithm delivers a \textbf{guaranteed-feasible solution} by applying an
+iterative repair operator after each crossover and a forced desasignation
+at the end. Even when the problem structure makes overallocation unavoidable,
+the final chromosome is cleaned to carry only soft penalties. The user
+also receives a \textbf{complete elite set} of the top unique solutions
+found, displayed as ranked alternatives. On a synthetic instance with
+$T=18$, $E=5$, and $R=30$, the averaged convergence over several runs
+starts from a soft-constraint penalty of around 2890 and settles at
+roughly 1300, showing steady improvement over 150 generations with
+regular cataclysmic restarts.
 
 \end{document}
