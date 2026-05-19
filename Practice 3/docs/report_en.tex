@@ -18,6 +18,7 @@
 
 % Graphics and Floats
 \usepackage{graphicx}
+\graphicspath{{./img/}}
 \usepackage{float}
 
 % Tables
@@ -102,17 +103,17 @@
 \subsection{Context and Motivation}
 
 Every year, to celebrate the \textit{International Day of Women and Girls in Science}
-(February 11\textsuperscript{th}), the University of Córdoba organises a programme of
-scientific outreach talks at local schools. Schools from the city and the surrounding
-province submit requests specifying the educational level and preferred topic of the
-desired talk. At the same time, researchers volunteer to deliver talks within their
-area of expertise, subject to constraints on travel and educational level.
+(February 11\textsuperscript{th}), the University of Córdoba organises scientific
+outreach talks at local schools. Schools from the city and the surrounding province
+send requests: each request states a topic and an educational level for the talk
+they want. At the same time, researchers volunteer to give talks in their own area
+of expertise, with some limits on travel and on how many talks they can give.
 
-Once both sets of requests are received, a coordinator must match talks to researchers.
-The matching must satisfy hard feasibility requirements while optimising a set of
-priority-based soft objectives. The number of researchers $R$ and the number of
-requested talks $T$ vary each year, producing two qualitatively different regimes that
-the algorithm must handle transparently.
+A coordinator must then match each talk to a suitable researcher. The match must
+respect a set of hard rules (feasibility) and also follow priority rules that reflect
+institutional goals. The number of researchers $R$ and the number of talks $T$ change
+every year, so the algorithm has to handle two different situations: when there are
+fewer researchers than talks, and when there are more.
 
 \subsection{Formal Problem Definition}
 
@@ -166,13 +167,13 @@ Each \textbf{researcher} $r \in \mathcal{R}$ is described by:
 
 \subsubsection{Decision Variable}
 
-The problem is equivalent to a \textbf{Generalised Assignment Problem} (GAP). The
-decision variable is an assignment function:
+This is a \textbf{Generalised Assignment Problem} (GAP). The decision variable
+is a simple mapping:
 \begin{equation}
   x : \mathcal{T} \to \mathcal{R} \cup \{-1\}
 \end{equation}
-where $x(t) = r$ means talk $t$ is assigned to researcher $r$, and $x(t) = -1$
-means talk $t$ is left unassigned.
+where $x(t) = r$ assigns talk $t$ to researcher $r$, and $x(t) = -1$ leaves the
+talk unassigned.
 
 \subsubsection{Hard Constraints}
 
@@ -224,13 +225,12 @@ We encode a solution as a one-dimensional integer array of length $T$:
 \end{equation}
 
 Position $i$ of the chromosome corresponds to talk $t_i$. The value $c_i$ is the
-\emph{index} of the researcher assigned to that talk (or $-1$ for unassigned). This
-\textbf{direct encoding} has several desirable properties:
-\begin{itemize}[itemsep=0.1em]
-  \item Compact representation: $T$ genes, each with at most $R+1$ possible values.
-  \item Simple crossover: any valid gene-level operator is applicable.
-  \item Transparent decoding: solution quality is immediately readable from the array.
-\end{itemize}
+\emph{index} of the researcher assigned to that talk (or $-1$ for unassigned).
+A direct integer-index encoding was chosen over binary or permutation-based
+representations because it keeps the chromosome length fixed at $T$ regardless
+of $R$, any gene-wise operator (crossover, mutation, repair) applies naturally,
+and the decoding is immediate: reading position $i$ tells which researcher
+covers talk $i$.
 
 \subsection{Preprocessing: Valid Researchers per Talk}
 
@@ -339,14 +339,15 @@ satisfies no soft constraint — outranks any infeasible solution.
     \textbf{Violation} & \textbf{Description} & \textbf{Default Weight} \\
     \midrule
     First-year school unserved    & School in its first year receives no talk          & 500 \\
-    Province school unserved      & Province school receives no talk ($T > R$)         & 300 \\
-    Disadvantaged area unserved   & Disadvantaged school receives no talk              & 400 \\
+    Province school unserved      & Province school receives no talk ($T > R$)         & 400 \\
+    Disadvantaged area unserved   & Disadvantaged school receives no talk              & 300 \\
     Public school unserved        & Public institution receives no talk                & 200 \\
     Concerted school unserved     & Concerted school receives no talk                  & 100 \\
     First-year researcher unused  & New researcher not selected ($R > T$)              & 200 \\
     Traveller unused in province  & Travelling researcher not used for province ($R > T$) & 150 \\
     Same school as last year      & Researcher revisits their school from last year    & 300 \\
     Same province as last year    & Province researcher goes to province again         & 150 \\
+    Unassigned talk               & No researcher assigned for a requested talk       & 10 \\
     \bottomrule
   \end{tabular}}
 \end{table}
@@ -367,8 +368,8 @@ DEFAULT_CONFIG = {
     "w_overallocation":     1_000_000,
     # Soft: unserved schools
     "w_first_year_school":  500,
-    "w_province_school":    300,
-    "w_disadvantaged":      400,
+    "w_province_school":    400,
+    "w_disadvantaged":      300,
     "w_public_institution": 200,
     "w_concerted":          100,
     # Soft: unused researchers (R > T regime)
@@ -377,6 +378,8 @@ DEFAULT_CONFIG = {
     # Soft: historical
     "w_same_school_as_last_year":   300,
     "w_same_province_as_last_year": 150,
+    # Unassigned talk
+    "w_unassigned_talk": 10,
 }
 \end{lstlisting}
 
@@ -387,32 +390,31 @@ DEFAULT_CONFIG = {
 \subsection{Overview of CHC}
 
 CHC (Cross-generational elitist selection, Heterogeneous recombination, Cataclysmic
-mutation) is an evolutionary algorithm proposed by Eshelman (1991) that combines
-aggressive elitism with operators designed to maintain population diversity. Its
-three defining mechanisms are:
+mutation) is an evolutionary algorithm proposed by Eshelman (1991). It combines a
+strong \emph{elitist} strategy (only the best individuals survive) with operators
+that keep the population diverse:
 \begin{enumerate}[itemsep=0.2em]
-  \item \textbf{Cross-generational elitism (C):} All individuals — old and new — compete
-        for survival; only the best $N_p$ are kept.
-  \item \textbf{HUX crossover (H):} A specialised operator that maximises diversity in
-        offspring while preserving strong genes from both parents.
-  \item \textbf{Cataclysmic restart (C):} When the population has converged completely,
-        a controlled restart diversifies around the best individual.
+  \item \textbf{Cross-generational elitism (C):} Old and new individuals compete
+        together; only the top $N_p$ survive.
+  \item \textbf{HUX crossover (H):} A crossover that produces children as different
+        from each other as possible while still mixing both parents.
+  \item \textbf{Cataclysmic restart (C):} When the population becomes too similar,
+        we restart around the best solution to explore new areas.
 \end{enumerate}
 
-Unlike standard GAs, CHC uses \emph{no mutation during the main loop}. Instead,
-incest prevention prevents premature convergence, and the restart provides macro-level
-diversity when the incest threshold reaches zero.
+Unlike a standard GA, CHC \emph{does not use mutation} during the main search.
+Instead, it uses incest prevention (two individuals only mate if they are different
+enough) to avoid premature convergence, and only re-introduces randomness through
+controlled restarts.
 
 \subsection{HUX Crossover}
 
-The Half-Uniform Crossover operator is the core recombination method in CHC. Given
-two parents $\mathbf{p}_1$ and $\mathbf{p}_2$, HUX:
+Half-Uniform Crossover (HUX) is the recombination method used in CHC. Given two
+parents $\mathbf{p}_1$ and $\mathbf{p}_2$:
 \begin{enumerate}[itemsep=0.1em]
-  \item Identifies the set $D$ of positions where $p_1$ and $p_2$ differ:
-        $D = \{i : c_i^{(1)} \neq c_i^{(2)}\}$.
-  \item Randomly selects exactly $\lfloor |D|/2 \rfloor$ positions from $D$ to swap.
-  \item Produces two offspring $\mathbf{c}_1$, $\mathbf{c}_2$ by exchanging the
-        selected genes between parents.
+  \item Find all positions where the parents differ: $D = \{i : c_i^{(1)} \neq c_i^{(2)}\}$.
+  \item Pick exactly half of those positions at random and swap them.
+  \item The result is two children, each containing a mix of both parents.
 \end{enumerate}
 
 \begin{equation}
@@ -421,9 +423,9 @@ two parents $\mathbf{p}_1$ and $\mathbf{p}_2$, HUX:
   = \left\lfloor \frac{|D(\mathbf{p}_1, \mathbf{p}_2)|}{2} \right\rfloor
 \end{equation}
 
-This property guarantees that each offspring is exactly halfway between the two parents
-in Hamming space, which is the furthest apart they can be while each carrying a mix of
-both parents. HUX maximises exploration among the offspring of a given pair.
+This equation means each child is equally far from one parent in Hamming distance
+as from the other parent. This keeps children as diverse as possible while still
+inheriting genetic material from both parents.
 
 \begin{lstlisting}[language=Python, caption={HUX crossover implementation}]
 def hux_crossover(parent1, parent2):
@@ -440,51 +442,138 @@ def hux_crossover(parent1, parent2):
 
 \subsection{Incest Prevention and the Hamming Distance Threshold}
 
-A key feature of CHC is the \textbf{incest prevention} mechanism. Two individuals are
-only allowed to mate if their Hamming distance exceeds a dynamic threshold $d$:
+CHC uses \textbf{incest prevention} to control diversity: two individuals can only
+mate if their Hamming distance is above a threshold $d$:
 
 \begin{equation}
   d_H(\mathbf{p}_1, \mathbf{p}_2) = \sum_{i=0}^{T-1} \mathbf{1}[c_i^{(1)} \neq c_i^{(2)}] > d
 \end{equation}
 
-The threshold $d$ is initialised to $\lfloor T/4 \rfloor$ and decreases by 1 each
-generation in which no offspring improves over both parents. This progressive relaxation
-allows the algorithm to increase mating pressure as the population converges, eventually
-reaching all pairs.
+The threshold starts at $\lfloor T/4 \rfloor$ and decreases by 1 each time no
+offspring manages to improve over its parents. This means that, as the population
+becomes more similar, more pairs are allowed to mate. When the threshold reaches 0,
+a restart is triggered.
 
-\textbf{Elitist replacement:} Children only enter the population if they strictly
-improve over at least one of their parents. This cross-generational competition ensures
-monotonic improvement: the best fitness never decreases.
+When offspring \emph{do} improve, the threshold rises gradually by
+$\lfloor T/8 \rfloor$ (rather than resetting all the way to $\lfloor T/4 \rfloor$,
+as in the original CHC), preserving some of the focused search momentum.
+
+\textbf{Elitist replacement:} A child only enters the population if it is strictly
+better than at least one of its parents. This guarantees that the best fitness
+never worsens from one generation to the next.
 
 \subsection{Cataclysmic Restart}
+\label{sec:restart}
 
-When $d$ reaches $0$ and no crossover produces improvements, the population has
-converged. Rather than terminating, CHC performs a \textbf{cataclysmic restart}:
+When $d$ reaches $0$ and no offspring can improve over their parents, the
+population has converged. CHC triggers a \textbf{cataclysmic restart} with
+the following enhancements:
 
 \begin{enumerate}[itemsep=0.1em]
-  \item The current best individual (the \emph{survivor}) is copied unchanged.
-  \item The remaining $N_p - 1$ individuals are created by randomly mutating exactly
-        $\lfloor \mu \cdot T \rfloor$ genes of the survivor ($\mu = 35\%$ by default).
-  \item Each mutated gene is replaced by a valid researcher drawn uniformly from
-        $V(t)$ for that position.
+  \item \textbf{Multiple survivors}: instead of keeping only the single best
+        individual, the restart preserves up to $\lfloor N_p/8 \rfloor$ top
+        unique elite solutions. Each survivor acts as a distinct genetic seed.
+  \item \textbf{Adaptive mutation rate}: starts at $\mu = 50\%$ and increases
+        by $5\%$ for each consecutive restart that fails to improve the best
+        fitness (capped at $80\%$). This gradually intensifies exploration.
+  \item Each mutant has $\lfloor \mu \cdot T \rfloor$ genes replaced by a
+        valid researcher drawn from $V(t)$, then passes through the full
+        \texttt{repair\_chromosome} operator to fix overallocation and fill
+        unassigned positions.
   \item The Hamming threshold is reset to $\lfloor T/4 \rfloor$.
 \end{enumerate}
 
-This restart is \emph{controlled}: the best solution is never lost, but the population
-is aggressively diversified around it, enabling further exploration in new regions.
+Additionally, a \textbf{stagnation-based restart} is triggered whenever the
+best fitness fails to improve for $\max(10, T/2)$ consecutive generations.
+This helps the algorithm escape plateaus even when the incest threshold has
+not yet reached zero.
 
-\begin{lstlisting}[language=Python, caption={Cataclysmic restart}]
-def cataclysmic_mutation(best, pop_size, mutation_rate, talks, valid_map, r_id_list):
-    new_population = [copy.copy(best)]
-    n_mutate = max(1, int(mutation_rate * len(talks)))
-    for _ in range(pop_size - 1):
-        mutant = copy.copy(best)
-        positions = random.sample(range(len(talks)), n_mutate)
-        for pos in positions:
-            mutant[pos] = repair_gene(pos, valid_map, r_id_list)
-        new_population.append(mutant)
-    return new_population
+\begin{lstlisting}[language=Python, caption={Cataclysmic restart (simplified)}]
+def cataclysmic_mutation(elites, pop_size, base_rate, stale,
+                         talks, valid_map, r_id_list, researchers):
+    rate = min(base_rate + 0.05 * stale, 0.8)    # adaptive
+    n_mutate = max(1, int(rate * len(talks)))
+    n_surv = min(len(elites), max(1, pop_size // 8))
+    new_pop = [copy.copy(s) for s in elites[:n_surv]]
+    for surv in elites[:n_surv]:
+        for _ in range(...):    # distributed mutants
+            mutant = copy.copy(surv)
+            positions = random.sample(range(T), n_mutate)
+            for pos in positions:
+                mutant[pos] = repair_gene(pos, valid_map, r_id_list)
+            mutant = repair_chromosome(mutant, r_id_list, researchers, valid_map)
+            new_pop.append(mutant)
+    return new_pop
 \end{lstlisting}
+
+\subsection{Repair Operator}
+
+After HUX crossover, the two children might violate the \textbf{overallocation}
+hard constraint: if both parents assign the same researcher to different talks,
+a child could end up with that researcher assigned to more talks than their
+\texttt{maxTalks} limit allows. The repair operator works in two phases:
+
+\begin{enumerate}[itemsep=0.1em]
+  \item \textbf{Fix overallocation}: detect any researcher with too many
+        talks, randomly pick the extra ones, and try to reassign them to a
+        different valid researcher. If no alternative exists, the talk is
+        left unassigned.
+  \item \textbf{Fill unassigned positions}: scan for genes set to $-1$ that
+        have at least one valid researcher with spare capacity, and fill them
+        where possible.
+\end{enumerate}
+
+This repair is applied immediately after crossover and also during cataclysmic
+restart. It keeps the population close to the feasible region without slowing
+down the search.
+
+\begin{lstlisting}[language=Python, caption={Repair operator — two phases}]
+def repair_chromosome(chromosome, researcher_ids, researchers, valid_map):
+    chrom = copy.copy(chromosome)
+
+    # Phase 1: fix overallocation
+    counts = {}
+    for pos, r_idx in enumerate(chrom):
+        if r_idx != -1:
+            counts[researcher_ids[r_idx]] = counts.get(..., 0) + 1
+    for r_str, count in counts.items():
+        if count > researchers[r_str].max_talks:
+            # reassign excess talks to other valid researchers
+            ...
+
+    # Phase 2: fill unassigned positions if possible
+    for pos, r_idx in enumerate(chrom):
+        if r_idx == -1:
+            for r_str in valid_map[pos]:
+                if usage.get(r_str, 0) < researchers[r_str].max_talks:
+                    chrom[pos] = researcher_ids.index(r_str)
+                    break
+    return chrom
+\end{lstlisting}
+
+\subsection{Elite Set}
+
+The algorithm does not return just the single best solution. Instead, it keeps
+a \textbf{diverse elite set} of the top unique individuals found during the
+entire run. This set is updated each generation and presented to the user at
+the end, so the coordinator can compare several high-quality alternatives
+and pick the one that best fits practical needs.
+
+Figure~\ref{fig:population} shows the fitness distribution of the final
+generation from the best-performing run. The top 5 individuals (the elite,
+in dark blue) are tightly clustered around the optimum, while the remaining
+population (grey) spans a wider fitness range — evidence that CHC preserves
+meaningful diversity even after convergence.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.75\textwidth]{population.png}
+  \caption{Final-population fitness distribution for the best run.
+           The top 5 elite solutions are highlighted in dark blue;
+           the remaining individuals show the diversity maintained by
+           CHC even at convergence.}
+  \label{fig:population}
+\end{figure}
 
 \subsection{Algorithm Flow}
 
@@ -495,6 +584,7 @@ Algorithm~\ref{alg:chc} summarises the complete CHC loop.
 \begin{minipage}{0.92\textwidth}
 \begin{lstlisting}[language=Python, caption={CHC main loop (simplified)}, label={alg:chc}]
 threshold = T // 4
+stagnation = 0
 population = initialise_population(pop_size)
 while generation < max_generations:
     shuffle(population)
@@ -511,12 +601,67 @@ while generation < max_generations:
         merge and keep top pop_size individuals   # cross-generational elitism
     else:
         threshold -= 1                            # tighten incest threshold
-    if threshold <= 0:
-        population = cataclysmic_restart(best)   # reset around best
+    if threshold <= 0 or stagnation >= max(10, T // 2):
+        population = cataclysmic_restart(elite, rate, stale)  # multi-survivor
         threshold = T // 4
+        stagnation = 0
     generation += 1
 \end{lstlisting}
 \end{minipage}
+\end{figure}
+
+\subsection{Gradual Threshold Reset}
+
+In the classic CHC algorithm, any improvement resets the incest threshold
+straight to $\lfloor T/4 \rfloor$. This can be too aggressive: after finding
+a small improvement, the population is allowed to mate with many very
+different individuals, losing the local search focus.
+
+We replace the hard reset with a \textbf{gradual ramp}:
+\begin{equation}
+  d \leftarrow \min\bigl(\lfloor T/4 \rfloor,\;
+                          d + \lfloor T/8 \rfloor\bigr)
+\end{equation}
+When children improve over their parents, the threshold rises by
+$\lfloor T/8 \rfloor$ instead of jumping to the ceiling. This keeps the
+population exploring the current region more thoroughly before reopening
+the search to distant individuals.
+
+\subsection{Stagnation-based Restart}
+
+The original CHC only triggers a restart when the incest threshold drops
+to zero. However, the gradual reset can keep the threshold positive for many
+generations even though the population has converged and no further
+improvements are happening.
+
+To handle this, a \textbf{stagnation counter} tracks how many consecutive
+generations pass without a new best fitness. If this counter exceeds
+$\max(10,\; \lfloor T/2 \rfloor)$ generations, a cataclysmic restart is
+triggered regardless of the threshold value. This restart also increments
+a \emph{stale restart} counter, which gradually increases the mutation
+rate (explained in Section~\ref{sec:restart}) to make successive restarts
+more disruptive until an improvement is found.
+
+\subsection{Convergence Behaviour}
+
+Figure~\ref{fig:convergence} shows the average convergence curve over 4
+independent runs on a synthetic instance with 18 talks, 5 schools, and 30
+researchers ($R > T$). The shaded band represents $\pm 1$ standard deviation.
+The initial high fitness (around 2900 on average) reflects soft-constraint
+penalties only — the 2-pass initialisation ensures every school receives at
+least one talk, so the hard $10^6$ penalty is never triggered. Over the first
+20--30 generations the algorithm improves the soft priorities, reaching a
+plateau around 1300. Red dashed lines mark cataclysmic restarts from the
+best run.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{convergence.png}
+  \caption{Average convergence over 4 runs on a synthetic instance
+           ($T{=}18, E{=}5, R{=}30$, 150 generations, pop.\ 40).
+           The shaded band shows $\pm 1\sigma$. Dashed vertical lines
+           mark cataclysmic restarts of the best run.}
+  \label{fig:convergence}
 \end{figure}
 
 \subsection{Parameter Configuration}
@@ -533,39 +678,48 @@ while generation < max_generations:
     Population size        & $N_p$  & 50 \\
     Maximum generations    & $G$    & 200 \\
     Initial threshold      & $d_0$  & $\lfloor T/4 \rfloor$ \\
-    Restart mutation rate  & $\mu$  & 35\% \\
+    Restart mutation rate  & $\mu$  & 50\% (adaptive up to 80\%) \\
     \bottomrule
   \end{tabular}
 \end{table}
 \renewcommand{\arraystretch}{1}
 
-The choice of $\mu = 35\%$ follows Eshelman's recommendation: too small a mutation
-produces restarts that are virtually identical to the best, while too large a value
-effectively discards the best solution's genetic information.
+The choice of $\mu = 50\%$ with adaptive scaling provides a stronger
+exploration baseline than the classic $35\%$ recommendation. When
+consecutive restarts fail to discover better solutions, the rate
+increases automatically, making each restart more disruptive until a
+new improvement is found.
 
 % ============================================================
 \section{Conclusions}
 % ============================================================
 
-This practice addressed the \textbf{Talk Allocation Problem} as a Generalised
-Assignment Problem with one hard categorical constraint per dimension (topic,
-level, location) and a rich set of lexicographic soft priorities. The CHC
-metaheuristic was selected because it naturally balances intense elitism with
-controlled diversity preservation, without relying on hand-tuned mutation
-probabilities during the main evolutionary loop.
+This project tackled the \textbf{Talk Allocation Problem}, a type of
+Generalised Assignment Problem where talks must be matched to researchers
+subject to several hard rules and a set of priority criteria. The
+\textbf{CHC metaheuristic} was chosen because it combines strong elitism with
+good diversity control, without relying on hand-tuned mutation probabilities
+during the main loop. The final implementation was enhanced with adaptive
+restart mutation, stagnation detection, a two-pass initialisation, and a
+repair operator — all of which improved population diversity by an order of
+magnitude (final-population fitness range went from 50 to 550).
 
-The modular penalty architecture allows practitioners at the University of Córdoba
-to adjust the relative importance of each priority rule — for example, giving more
-weight to disadvantaged areas in a particular year — without touching the algorithm's
-source code.
+The penalty-based fitness function is fully configurable: each constraint
+has its own weight in a dictionary, so the university can adjust the
+importance of each priority rule year by year without touching the source
+code. Hard constraints use a penalty of $10^6$, guaranteeing that any
+feasible assignment outranks any infeasible one.
 
-The mandatory preprocessing phase (\texttt{valid\_researchers\_per\_talk}) reduces
-feasibility enforcement to an $O(1)$ lookup during fitness evaluation, making the
-algorithm scalable to larger real-world instances with hundreds of talks and researchers.
+A preprocessing step builds $V(t)$ — the set of researchers that can
+feasibly cover each talk — by filtering on topic, level, and travel.
+This makes both initialisation and fitness evaluation faster, and lets
+infeasible talks stay as $-1$ without wasting search effort.
 
-Future work could introduce a \emph{repair operator} that, whenever a child violates a
-hard constraint on a gene, replaces that gene with a draw from $V(t)$ before
-evaluating fitness. This would further accelerate convergence by keeping the
-population closer to the feasible region at all times.
+The algorithm returns a \textbf{complete elite set} of the top unique
+solutions found, displayed to the user as ranked alternatives. On a
+synthetic instance with $T=18$, $E=5$, and $R=30$, the averaged
+convergence over several runs starts from a soft-constraint penalty
+of around 2890 and settles at roughly 1300, showing steady improvement
+over 150 generations with regular cataclysmic restarts.
 
 \end{document}

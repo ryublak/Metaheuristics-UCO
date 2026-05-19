@@ -19,8 +19,8 @@ DEFAULT_CONFIG: Dict[str, float] = {
 
     # Soft constraint penalties (tunable)
     "w_first_year_school": 500,       # school never participated before gets no talk
-    "w_province_school": 300,         # province school gets no talk
-    "w_disadvantaged": 400,           # disadvantaged area school gets no talk
+    "w_province_school": 400,         # province school gets no talk
+    "w_disadvantaged": 300,           # disadvantaged area school gets no talk
     "w_public_institution": 200,      # public school gets no talk (lower than above)
     "w_concerted": 100,               # concerted school preference over private
 
@@ -34,79 +34,24 @@ DEFAULT_CONFIG: Dict[str, float] = {
 
     # Overallocation penalty (same researcher assigned more than allowed)
     "w_overallocation": 1_000_000,
+
+    # Direct penalty per unassigned talk (soft, helps differentiate similar solutions)
+    "w_unassigned_talk": 10,
 }
 
 
 # ---------------------------------------------------------------------------
-# Individual constraint functions
+# Individual soft-constraint functions
 # ---------------------------------------------------------------------------
 
-def _penalty_location_mismatch(
-    chromosome: List[int],
-    talks: List[Talk],
-    researchers: Dict[str, Researcher],
-    schools: Dict[str, School],
-    researcher_index: Dict[str, Researcher],
-    w: float,
-) -> float:
-    """Penalty for each assignment where the researcher cannot reach the school."""
-    total = 0.0
-    for talk_id, r_id in enumerate(chromosome):
-        if r_id == -1:
-            continue
-        r = researcher_index.get(str(r_id))
-        if r is None:
-            continue
-        school = schools[talks[talk_id].school_id]
-        if school.location == "province" and not r.can_travel:
-            total += w
-    return total
-
-
-def _penalty_school_no_talk(
-    chromosome: List[int],
-    talks: List[Talk],
-    schools: Dict[str, School],
-    num_researchers: int,
-    num_talks: int,
-    w: float,
-) -> float:
-    """Hard penalty: if R >= T every school must receive at least one talk."""
-    if num_researchers < num_talks:
-        return 0.0  # constraint does not apply when researchers are scarce
-    assigned_schools = {talks[t_id].school_id for t_id, r_id in enumerate(chromosome) if r_id != -1}
-    unserved = set(schools.keys()) - assigned_schools
-    return len(unserved) * w
-
-
-def _penalty_overallocation(
-    chromosome: List[int],
-    researchers: Dict[str, Researcher],
-    w: float,
-) -> float:
-    """Penalty for assigning a researcher more talks than their max_talks allows."""
-    counts: Dict[str, int] = {}
-    for r_id in chromosome:
-        if r_id == -1:
-            continue
-        key = str(r_id)
-        counts[key] = counts.get(key, 0) + 1
-    total = 0.0
-    for r_id_str, count in counts.items():
-        r = researchers.get(r_id_str)
-        if r and count > r.max_talks:
-            total += (count - r.max_talks) * w
-    return total
-
-
 def _penalty_unserved_school_soft(
-    chromosome: List[int],
+    resolved: List[str | None],
     talks: List[Talk],
     schools: Dict[str, School],
     config: Dict[str, float],
 ) -> float:
     """Soft penalties for schools that receive no talk, weighted by their attributes."""
-    assigned_schools = {talks[t_id].school_id for t_id, r_id in enumerate(chromosome) if r_id != -1}
+    assigned_schools = {talks[t_id].school_id for t_id, r_str in enumerate(resolved) if r_str is not None}
     total = 0.0
     for s_id, school in schools.items():
         if s_id in assigned_schools:
@@ -125,7 +70,7 @@ def _penalty_unserved_school_soft(
 
 
 def _penalty_researcher_soft(
-    chromosome: List[int],
+    resolved: List[str | None],
     researchers: Dict[str, Researcher],
     num_talks: int,
     config: Dict[str, float],
@@ -138,7 +83,7 @@ def _penalty_researcher_soft(
     if num_researchers <= num_talks:
         return 0.0
 
-    used_ids = {str(r_id) for r_id in chromosome if r_id != -1}
+    used_ids = {r_str for r_str in resolved if r_str is not None}
     total = 0.0
     for r in researchers.values():
         if r.researcher_id in used_ids:
@@ -151,7 +96,7 @@ def _penalty_researcher_soft(
 
 
 def _penalty_historical(
-    chromosome: List[int],
+    resolved: List[str | None],
     talks: List[Talk],
     schools: Dict[str, School],
     researcher_index: Dict[str, Researcher],
@@ -159,10 +104,10 @@ def _penalty_historical(
 ) -> float:
     """Penalties for historical patterns: same school or same province as last year."""
     total = 0.0
-    for talk_id, r_id in enumerate(chromosome):
-        if r_id == -1:
+    for talk_id, r_str in enumerate(resolved):
+        if r_str is None:
             continue
-        r = researcher_index.get(str(r_id))
+        r = researcher_index.get(r_str)
         if r is None:
             continue
         school = schools[talks[talk_id].school_id]
@@ -205,18 +150,17 @@ def compute_fitness(
     if config is None:
         config = DEFAULT_CONFIG
 
-    researcher_index = researchers  # alias for clarity
     num_talks = len(talks)
     num_researchers = len(researchers)
 
     # Map integer IDs in chromosome back to string keys
     # Chromosome stores indices (0..R-1) or -1; we need the string researcher_id
-    r_id_list = list(researchers.keys())  # ordered index -> str key
+    researcher_ids = list(researchers.keys())  # ordered index -> str key
 
     def resolve(idx: int) -> str | None:
-        if idx == -1 or idx >= len(r_id_list):
+        if idx == -1 or idx >= len(researcher_ids):
             return None
-        return r_id_list[idx]
+        return researcher_ids[idx]
 
     resolved = [resolve(idx) for idx in chromosome]  # list[str | None]
 
@@ -226,7 +170,7 @@ def compute_fitness(
     for talk_id, r_str in enumerate(resolved):
         if r_str is None:
             continue
-        r = researcher_index.get(r_str)
+        r = researchers.get(r_str)
         if r is None:
             continue
         school = schools[talks[talk_id].school_id]
@@ -246,25 +190,28 @@ def compute_fitness(
         if r_str:
             counts[r_str] = counts.get(r_str, 0) + 1
     for r_str, cnt in counts.items():
-        r = researcher_index.get(r_str)
+        r = researchers.get(r_str)
         if r and cnt > r.max_talks:
             fitness += (cnt - r.max_talks) * config["w_overallocation"]
 
     # --- Soft: unserved school penalties by priority ---
     fitness += _penalty_unserved_school_soft(
-        [r_id_list.index(rs) if rs else -1 for rs in resolved],
-        talks, schools, config,
+        resolved, talks, schools, config,
     )
 
     # --- Soft: unused researcher penalties (R > T case) ---
     fitness += _penalty_researcher_soft(
-        chromosome, researchers, num_talks, config,
+        resolved, researchers, num_talks, config,
     )
 
     # --- Soft: historical penalties ---
     fitness += _penalty_historical(
-        chromosome, talks, schools, researcher_index, config,
+        resolved, talks, schools, researchers, config,
     )
+
+    # --- Soft: unassigned talk penalty (differentiates similar solutions) ---
+    n_unassigned = sum(1 for r_str in resolved if r_str is None)
+    fitness += n_unassigned * config.get("w_unassigned_talk", 10)
 
     return fitness
 
@@ -273,7 +220,7 @@ def compute_fitness(
 # Chromosome gene repair helper
 # ---------------------------------------------------------------------------
 
-def repair_gene(talk_id: int, valid_map: Dict[int, List[str]], r_id_list: List[str]) -> int:
+def repair_gene(talk_id: int, valid_map: Dict[int, List[str]], researcher_ids: List[str]) -> int:
     """
     Return a valid researcher index for a given talk, chosen from valid_map.
     If no valid researcher exists, return -1.
@@ -283,7 +230,4 @@ def repair_gene(talk_id: int, valid_map: Dict[int, List[str]], r_id_list: List[s
     if not candidates:
         return -1
     r_str = random.choice(candidates)
-    try:
-        return r_id_list.index(r_str)
-    except ValueError:
-        return -1
+    return researcher_ids.index(r_str)

@@ -8,20 +8,18 @@ Usage:
                   [--pop-size 50] [--generations 200] [--seed 42]
                   [--verbose]
 
-If no CSVs are provided, a synthetic instance is generated and saved to ./data/.
+If no CSVs are provided, an instance is generated using the professor's
+data_generator_talks11f logic and the algorithm runs on it directly.
 """
 
 import argparse
-import random
-import sys
-import os
 import json
+import sys
 import time
 from pathlib import Path
 from typing import Dict, List
 
 import pandas as pd
-import numpy as np
 
 # Ensure src/ is on the path when running from the project root
 sys.path.insert(0, str(Path(__file__).parent))
@@ -30,73 +28,7 @@ from models import School, Talk, Researcher
 from data_loader import load_instance, build_valid_researchers_per_talk
 from fitness import compute_fitness, DEFAULT_CONFIG
 from chc import chc
-
-
-# ---------------------------------------------------------------------------
-# Synthetic data generator (for quick testing without CSV files)
-# ---------------------------------------------------------------------------
-
-def _generate_synthetic_instance(
-    num_schools: int = 10,
-    num_talks: int = 20,
-    num_researchers: int = 15,
-    seed: int = 0,
-) -> tuple:
-    """Generate a small synthetic instance and return (schools, talks, researchers)."""
-    rng = random.Random(seed)
-    np_rng = np.random.default_rng(seed)
-
-    topics = ["biology", "chemistry", "physics", "computer science", "maths",
-              "education", "agronomy", "electronics", "psychology", "engineering"]
-    levels = ["preschool", "primary", "secondary", "high school", "vocational training"]
-    locations = ["city", "province"]
-    school_types = ["public", "concerted", "private"]
-
-    schools: Dict[str, School] = {}
-    for i in range(num_schools):
-        sid = f"school{i+1}"
-        loc = rng.choice(locations)
-        stype = rng.choice(school_types)
-        dis = rng.random() < 0.3 if stype == "public" else False
-        schools[sid] = School(
-            school_id=sid,
-            location=loc,
-            disadvantaged_area=dis,
-            school_type=stype,
-            first_year=rng.random() < 0.4,
-        )
-
-    school_ids = list(schools.keys())
-    talks: List[Talk] = []
-    for i in range(num_talks):
-        p_any = 0.3  # 30% chance of "any" topic
-        top = "any" if rng.random() < p_any else rng.choice(topics)
-        talks.append(Talk(
-            talk_id=i,
-            topic=top,
-            level=rng.choice(levels),
-            school_id=rng.choice(school_ids),
-        ))
-
-    researchers: Dict[str, Researcher] = {}
-    for i in range(num_researchers):
-        rid = f"researcher{i+1}"
-        prev_prov = rng.random() < 0.4
-        prev_school_options = [s for s, sc in schools.items()
-                                if (sc.location == "province") == prev_prov]
-        prev_school = rng.choice(prev_school_options) if prev_school_options else rng.choice(school_ids)
-        researchers[rid] = Researcher(
-            researcher_id=rid,
-            topic=rng.choice(topics),
-            level=rng.choice(levels),
-            can_travel=rng.random() < 0.6,
-            first_participation=rng.random() < 0.3,
-            previous_talk_province=prev_prov,
-            previous_school=prev_school,
-            max_talks=2 if rng.random() < 0.4 else 1,
-        )
-
-    return schools, talks, researchers
+from generate_instance import generate_instance
 
 
 # ---------------------------------------------------------------------------
@@ -105,12 +37,12 @@ def _generate_synthetic_instance(
 
 def _decode_chromosome(chrom, talks, researchers, schools):
     """Return a human-readable summary of the solution."""
-    r_id_list = list(researchers.keys())
+    researcher_ids = list(researchers.keys())
     rows = []
     for talk_id, idx in enumerate(chrom):
         talk = talks[talk_id]
         school = schools[talk.school_id]
-        r_str = r_id_list[idx] if 0 <= idx < len(r_id_list) else "UNASSIGNED"
+        r_str = researcher_ids[idx] if 0 <= idx < len(researcher_ids) else "UNASSIGNED"
         r = researchers.get(r_str)
         rows.append({
             "talk_id": talk_id,
@@ -130,11 +62,13 @@ def _print_solution_summary(rows, best_fitness, elapsed):
     print("\n" + "=" * 75)
     print("  FINAL SOLUTION")
     print("=" * 75)
-    hdr = f"{'Talk':>5} | {'School':<12} | {'Location':<10} | {'Topic':<18} | {'Researcher':<14} | {'Level':<18}"
+    hdr = (f"{'Talk':>5} | {'School':<12} | {'Location':<10} | "
+           f"{'Topic':<18} | {'Researcher':<14} | {'Level':<18}")
     print(hdr)
     print("-" * 75)
     for r in rows:
-        print(f"{r['talk_id']:>5} | {r['school']:<12} | {r['location']:<10} | {r['topic']:<18} | {r['researcher']:<14} | {r['level']:<18}")
+        print(f"{r['talk_id']:>5} | {r['school']:<12} | {r['location']:<10} | "
+              f"{r['topic']:<18} | {r['researcher']:<14} | {r['level']:<18}")
     print("=" * 75)
     print(f"  Best Fitness (penalty): {best_fitness:.2f}")
     print(f"  Elapsed time:           {elapsed:.2f}s")
@@ -156,18 +90,21 @@ def _print_school_coverage(rows, schools):
 
 def parse_args():
     parser = argparse.ArgumentParser(description="CHC Talk Allocation – Practice 3")
-    parser.add_argument("--schools",      type=str, default=None)
-    parser.add_argument("--talks",        type=str, default=None)
-    parser.add_argument("--researchers",  type=str, default=None)
-    parser.add_argument("--pop-size",     type=int, default=50)
-    parser.add_argument("--generations",  type=int, default=200)
-    parser.add_argument("--mutation-rate",type=float, default=0.35)
-    parser.add_argument("--seed",         type=int, default=42)
-    parser.add_argument("--verbose",      action="store_true")
-    # Synthetic instance params
-    parser.add_argument("--num-schools",  type=int, default=10)
-    parser.add_argument("--num-talks",    type=int, default=20)
+    parser.add_argument("--schools",       type=str, default=None)
+    parser.add_argument("--talks",         type=str, default=None)
+    parser.add_argument("--researchers",   type=str, default=None)
+    parser.add_argument("--pop-size",      type=int, default=50)
+    parser.add_argument("--generations",   type=int, default=200)
+    parser.add_argument("--mutation-rate", type=float, default=0.50)
+    parser.add_argument("--seed",          type=int, default=42)
+    parser.add_argument("--verbose",       action="store_true")
+    # Synthetic instance params (used when no CSVs are given)
+    parser.add_argument("--num-schools",     type=int, default=10)
+    parser.add_argument("--num-talks",       type=int, default=20)
     parser.add_argument("--num-researchers", type=int, default=15)
+    parser.add_argument("--prob-topics",     type=float, default=0.2,
+                        help="Probability a talk requests a specific topic "
+                             "(0 = all 'any', default 0.2)")
     return parser.parse_args()
 
 
@@ -178,16 +115,21 @@ def main():
 
     # --- Load or generate data ---
     if args.schools and args.talks and args.researchers:
-        print(f"  Loading instance from CSVs…")
+        print("  Loading instance from CSVs…")
         schools, talks, researchers, valid_map = load_instance(
             args.schools, args.talks, args.researchers
         )
     else:
-        print(f"  No CSVs provided – generating synthetic instance "
+        print(f"  No CSVs provided – generating instance "
               f"({args.num_schools} schools, {args.num_talks} talks, "
-              f"{args.num_researchers} researchers)…")
-        schools, talks, researchers = _generate_synthetic_instance(
-            args.num_schools, args.num_talks, args.num_researchers, seed=args.seed
+              f"{args.num_researchers} researchers, "
+              f"prob_topics={args.prob_topics})…")
+        schools, talks, researchers = generate_instance(
+            num_schools=args.num_schools,
+            num_talks=args.num_talks,
+            num_researchers=args.num_researchers,
+            prob_topics=args.prob_topics,
+            seed=args.seed,
         )
         valid_map = build_valid_researchers_per_talk(talks, researchers, schools)
 
@@ -198,14 +140,15 @@ def main():
     # Summarise valid researchers per talk
     coverages = [len(v) for v in valid_map.values()]
     n_infeasible = sum(1 for c in coverages if c == 0)
-    print(f"  Preprocessing: avg valid researchers/talk = {sum(coverages)/max(len(coverages),1):.1f} "
+    print(f"  Preprocessing: avg valid researchers/talk = "
+          f"{sum(coverages) / max(len(coverages), 1):.1f} "
           f"| infeasible talks (no valid researcher) = {n_infeasible}")
 
     # --- Run CHC ---
     print(f"\n  Running CHC (pop={args.pop_size}, gen={args.generations}, "
           f"mutation_rate={args.mutation_rate}, seed={args.seed})…\n")
     t0 = time.time()
-    best_chrom, best_fitness, convergence = chc(
+    best_chrom, best_fitness, convergence, elite_set, restart_gens, _final_fitnesses = chc(
         talks=talks,
         schools=schools,
         researchers=researchers,
@@ -224,13 +167,40 @@ def main():
     _print_solution_summary(decoded, best_fitness, elapsed)
     _print_school_coverage(decoded, schools)
 
+    # Display elite set (top unique solutions) for user choice
+    print("\n" + "=" * 75)
+    print("  ELITE SET — Top alternative solutions")
+    print("=" * 75)
+    for rank, (chrom, fit) in enumerate(elite_set, 1):
+        n_unassigned = sum(1 for g in chrom if g == -1)
+        print(f"  #{rank}: fitness={fit:.2f} | unassigned talks={n_unassigned}")
+    print("=" * 75)
+
     # Save convergence data
     out_dir = Path(__file__).parent.parent / "data"
     out_dir.mkdir(exist_ok=True)
     conv_path = out_dir / "convergence.json"
+    elite_info = [{"rank": i + 1, "fitness": f, "unassigned": sum(1 for g in c if g == -1)}
+                  for i, (c, f) in enumerate(elite_set)]
     with open(conv_path, "w") as f:
-        json.dump({"convergence": convergence, "best_fitness": best_fitness}, f)
+        json.dump({
+            "convergence": convergence,
+            "restart_generations": restart_gens,
+            "best_fitness": best_fitness,
+            "elite_set": elite_info,
+        }, f)
     print(f"\n  Convergence curve saved to {conv_path}")
+
+    # Generate plots
+    try:
+        from plot_results import plot_all
+        img_dir = Path(__file__).parent.parent / "docs" / "img"
+        plot_all(str(conv_path), str(img_dir))
+        print(f"  Plots saved to {img_dir}")
+    except ImportError as e:
+        print(f"  [INFO] plot_results module not found, skipping plots ({e})")
+    except Exception as e:
+        print(f"  [WARN] Could not generate plots: {e}")
 
 
 if __name__ == "__main__":
