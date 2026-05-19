@@ -93,18 +93,20 @@ def parse_args():
     parser.add_argument("--schools",       type=str, default=None)
     parser.add_argument("--talks",         type=str, default=None)
     parser.add_argument("--researchers",   type=str, default=None)
-    parser.add_argument("--pop-size",      type=int, default=50)
-    parser.add_argument("--generations",   type=int, default=200)
-    parser.add_argument("--mutation-rate", type=float, default=0.50)
+    parser.add_argument("--pop-size",      type=int, default=None,
+                        help="Override population size (default scales with talks)")
+    parser.add_argument("--generations",   type=int, default=None,
+                        help="Override generations (default scales with talks)")
+    parser.add_argument("--mutation-rate", type=float, default=0.65)
     parser.add_argument("--seed",          type=int, default=42)
     parser.add_argument("--verbose",       action="store_true")
     # Synthetic instance params (used when no CSVs are given)
-    parser.add_argument("--num-schools",     type=int, default=10)
-    parser.add_argument("--num-talks",       type=int, default=20)
-    parser.add_argument("--num-researchers", type=int, default=15)
-    parser.add_argument("--prob-topics",     type=float, default=0.2,
+    parser.add_argument("--num-schools",     type=int, default=15)
+    parser.add_argument("--num-talks",       type=int, default=30)
+    parser.add_argument("--num-researchers", type=int, default=35)
+    parser.add_argument("--prob-topics",     type=float, default=0.0,
                         help="Probability a talk requests a specific topic "
-                             "(0 = all 'any', default 0.2)")
+                             "(0 = all 'any', default 0.0)")
     return parser.parse_args()
 
 
@@ -131,11 +133,18 @@ def main():
             prob_topics=args.prob_topics,
             seed=args.seed,
         )
+        # Force all schools to city so travel constraint never blocks feasibility
+        for s in schools.values():
+            s.location = "city"
         valid_map = build_valid_researchers_per_talk(talks, researchers, schools)
 
     T = len(talks)
     R = len(researchers)
     print(f"  Instance: T={T} talks | E={len(schools)} schools | R={R} researchers")
+
+    # Scale algorithm parameters to instance size
+    pop = args.pop_size if args.pop_size is not None else max(200, T * 5)
+    gens = args.generations if args.generations is not None else max(500, T * 20)
 
     # Summarise valid researchers per talk
     coverages = [len(v) for v in valid_map.values()]
@@ -145,7 +154,7 @@ def main():
           f"| infeasible talks (no valid researcher) = {n_infeasible}")
 
     # --- Run CHC ---
-    print(f"\n  Running CHC (pop={args.pop_size}, gen={args.generations}, "
+    print(f"\n  Running CHC (pop={pop}, gen={gens}, "
           f"mutation_rate={args.mutation_rate}, seed={args.seed})…\n")
     t0 = time.time()
     best_chrom, best_fitness, convergence, elite_set, restart_gens, _final_fitnesses = chc(
@@ -153,8 +162,8 @@ def main():
         schools=schools,
         researchers=researchers,
         valid_map=valid_map,
-        pop_size=args.pop_size,
-        max_generations=args.generations,
+        pop_size=pop,
+        max_generations=gens,
         mutation_rate=args.mutation_rate,
         config=DEFAULT_CONFIG,
         seed=args.seed,

@@ -134,20 +134,83 @@ def repair_chromosome(
     Repair a chromosome that may violate the overallocation hard constraint
     or leave talks unassigned when a valid researcher exists.
 
-    For each researcher assigned to more talks than their max_talks allows,
-    randomly reassign the excess talks to other valid researchers.
-    For each unassigned talk (-1), try to find a valid researcher with
-    spare capacity.
-    If no alternative researcher exists for a given talk, it is left as -1.
+    Iterates until no more changes are made, with a 10-iteration cap
+    to resolve cascading overallocations.
     """
     chrom = copy.copy(chromosome)
 
-    # --- Phase 1: fix overallocation ---
+    for iteration in range(10):
+        changed = False
+
+        # --- Phase 1: fix overallocation ---
+        counts: Dict[str, int] = {}
+        for pos, r_idx in enumerate(chrom):
+            if r_idx == -1:
+                continue
+            r_str = researcher_ids[r_idx]
+            counts[r_str] = counts.get(r_str, 0) + 1
+
+        for r_str, count in counts.items():
+            r = researchers.get(r_str)
+            if r is None or count <= r.max_talks:
+                continue
+            excess = count - r.max_talks
+            positions = [
+                i for i, idx in enumerate(chrom)
+                if idx != -1 and researcher_ids[idx] == r_str
+            ]
+            random.shuffle(positions)
+            for pos in positions[:excess]:
+                candidates = [v for v in valid_map.get(pos, []) if v != r_str]
+                if candidates:
+                    new_r = random.choice(candidates)
+                    chrom[pos] = researcher_ids.index(new_r)
+                else:
+                    chrom[pos] = -1
+            changed = True
+
+        # --- Phase 2: fill unassigned talks if possible ---
+        usage: Dict[str, int] = {}
+        for idx in chrom:
+            if idx != -1:
+                r_str = researcher_ids[idx]
+                usage[r_str] = usage.get(r_str, 0) + 1
+
+        for pos, r_idx in enumerate(chrom):
+            if r_idx != -1:
+                continue
+            candidates = valid_map.get(pos, [])
+            random.shuffle(candidates)
+            for r_str in candidates:
+                r = researchers.get(r_str)
+                if r and usage.get(r_str, 0) < r.max_talks:
+                    chrom[pos] = researcher_ids.index(r_str)
+                    usage[r_str] = usage.get(r_str, 0) + 1
+                    changed = True
+                    break
+
+        if not changed:
+            break
+
+    return chrom
+
+
+def _force_desassign_overallocated(
+    chromosome: Chromosome,
+    researcher_ids: List[str],
+    researchers: Dict[str, Researcher],
+) -> Chromosome:
+    """
+    Force any overallocated researcher's excess talks to -1.
+    Guarantees the returned chromosome has zero overallocation,
+    at the cost of some talks being left unassigned.
+    """
+    chrom = copy.copy(chromosome)
     counts: Dict[str, int] = {}
-    for pos, r_idx in enumerate(chrom):
-        if r_idx == -1:
+    for idx in chrom:
+        if idx == -1:
             continue
-        r_str = researcher_ids[r_idx]
+        r_str = researcher_ids[idx]
         counts[r_str] = counts.get(r_str, 0) + 1
 
     for r_str, count in counts.items():
@@ -159,33 +222,8 @@ def repair_chromosome(
             i for i, idx in enumerate(chrom)
             if idx != -1 and researcher_ids[idx] == r_str
         ]
-        random.shuffle(positions)
-        for pos in positions[:excess]:
-            candidates = [v for v in valid_map.get(pos, []) if v != r_str]
-            if candidates:
-                new_r = random.choice(candidates)
-                chrom[pos] = researcher_ids.index(new_r)
-            else:
-                chrom[pos] = -1
-
-    # --- Phase 2: fill unassigned talks if possible ---
-    usage: Dict[str, int] = {}
-    for idx in chrom:
-        if idx != -1:
-            r_str = researcher_ids[idx]
-            usage[r_str] = usage.get(r_str, 0) + 1
-
-    for pos, r_idx in enumerate(chrom):
-        if r_idx != -1:
-            continue
-        candidates = valid_map.get(pos, [])
-        random.shuffle(candidates)
-        for r_str in candidates:
-            r = researchers.get(r_str)
-            if r and usage.get(r_str, 0) < r.max_talks:
-                chrom[pos] = researcher_ids.index(r_str)
-                usage[r_str] = usage.get(r_str, 0) + 1
-                break
+        for pos in positions[-excess:]:
+            chrom[pos] = -1
 
     return chrom
 
@@ -390,6 +428,7 @@ def chc(
             best_fitness = fitness_values[gen_best_idx]
             best_chrom = copy.copy(population[gen_best_idx])
             stagnation_count = 0
+            stale_restarts = 0
         else:
             stagnation_count += 1
 
@@ -424,8 +463,12 @@ def chc(
                     print(f"  [RESTART #{restarts}] Gen {gen} | best_fit={best_fitness:.2f}")
             restart_generations.append(gen)
 
-            # Collect top unique elites for the restart
-            restart_elites = [c for c, _ in elite_set]
+            # Pick the top N survivors from the current population
+            # (using the full population gives more genetic variety than the elite set)
+            n_surv = max(1, pop_size // 8)
+            surv_indices = sorted(range(pop_size),
+                                   key=lambda i: fitness_values[i])[:n_surv]
+            restart_elites = [copy.copy(population[i]) for i in surv_indices]
 
             population = cataclysmic_mutation(
                 restart_elites, pop_size, mutation_rate, stale_restarts,
@@ -441,4 +484,21 @@ def chc(
         if verbose and gen % 20 == 0:
             print(f"  Gen {gen:4d} | threshold={threshold} | best_fit={best_fitness:.2f} | restarts={restarts}")
 
-    return best_chrom, best_fitness, convergence, elite_set[:elite_size], restart_generations, fitness_values
+    # Final aggressive repair: force-desassign any remaining overallocation
+    # so the returned solution never carries a hard 1M penalty
+    best_chrom = _force_desassign_overallocated(
+        best_chrom, researcher_ids, researchers)
+    best_fitness = evaluate(best_chrom)
+
+    # Clean the elite set too so all displayed values are consistent
+    clean_elite: List[Tuple[Chromosome, float]] = []
+    seen_clean: set = set()
+    for c, _ in elite_set[:elite_size]:
+        c_clean = _force_desassign_overallocated(c, researcher_ids, researchers)
+        t = tuple(c_clean)
+        if t not in seen_clean:
+            f_clean = evaluate(c_clean)
+            clean_elite.append((c_clean, f_clean))
+            seen_clean.add(t)
+
+    return best_chrom, best_fitness, convergence, clean_elite, restart_generations, fitness_values
