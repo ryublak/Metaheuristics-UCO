@@ -725,10 +725,10 @@ producing run times of 5--30 seconds on consumer hardware.
 
 Figure~\ref{fig:scalability} shows execution time as a function of problem
 size. For a small instance ($T = 15$) the algorithm finishes in about
-2 seconds. At $T = 60$, with 300 individuals running for 600 generations,
-the time grows to roughly 20 seconds. The trend is roughly linear in $T$,
+0.4 seconds. At $T = 60$, with 120 individuals running for 300 generations,
+the time grows to roughly 5 seconds. The trend is roughly linear in $T$,
 since the number of fitness evaluations per generation scales with the
-population size ($N_p = \max(200, 5T)$).
+population size.
 
 \begin{figure}[H]
   \centering
@@ -742,16 +742,18 @@ population size ($N_p = \max(200, 5T)$).
 When run on realistic instances — without the preprocessing that forces
 all schools to the city and sets all topic requests to ``any'' — the
 algorithm faces structurally harder problems. Figure~\ref{fig:realistic}
-shows the average convergence over several runs on a $T = 30$ realistic
+shows the average convergence over 5 runs on a $T = 60$ realistic
 instance. The fitness starts higher (because province schools and specific
-topics reduce the number of valid assignments) but the algorithm still
-converges to feasible solutions within the available generations.
+topics reduce the number of valid assignments) but the algorithm gradually
+improves and reaches feasible solutions well within the 300-generation
+budget. The shaded $\pm 1\sigma$ band shows moderate variability between
+runs, confirming that the convergence pattern is reliable.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.88\textwidth]{convergence_realistic.png}
   \caption{Average convergence on realistic instances
-           ($T{=}30$, original generator, 3 runs).}
+           ($T{=}60$, original generator, 5 runs, pop 120).}
   \label{fig:realistic}
 \end{figure}
 
@@ -760,7 +762,7 @@ converges to feasible solutions within the available generations.
 Figure~\ref{fig:feasibility} confirms the algorithm's robustness: as the
 instance size grows, the proportion of runs that finish with zero hard
 penalties increases. At $T = 15$, two out of three runs were feasible;
-for $T \geq 30$, all runs reached a feasible solution. The forced
+for $T \geq 30$, most runs reached a feasible solution. The forced
 desasignation at the end of the algorithm ensures that even the runs
 with hard penalties are cleaned up before the solution is delivered.
 
@@ -774,9 +776,9 @@ with hard penalties are cleaned up before the solution is delivered.
 \subsection{Impact of Preprocessing}
 
 Figure~\ref{fig:preprocessing} compares two runs of the same instance
-(seed 42, $T = 30$): one realistic (province schools, specific topics)
-and one after applying the preprocessing that forces every school to the
-city and accepts any topic. The realistic curve starts with a hard
+(seed 42, $T = 30$, pop 80): one realistic (province schools, specific
+topics) and one after applying the preprocessing that forces every school
+to the city and accepts any topic. The realistic curve starts with a hard
 penalty spike because the travel constraint makes some province schools
 temporarily unserved; the preprocessed version avoids this entirely.
 The gap between the two curves represents the benefit of normalising

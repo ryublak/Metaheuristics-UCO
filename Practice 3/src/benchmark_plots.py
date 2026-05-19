@@ -236,7 +236,7 @@ def plot_feasibility(results, output_path):
 def plot_comparison_preprocessing(output_path):
     seed = 42
     num_schools, num_talks, num_researchers = 10, 30, 35
-    pop, gens = 200, 600
+    pop, gens = 80, 300
 
     # Realistic (no preprocessing)
     s_r, t_r, r_r = generate_realistic(num_schools, num_talks,
@@ -290,7 +290,7 @@ def plot_fitness_breakdown(output_path):
 
     best_c, best_f, _, _, _, _ = chc(
         talks, schools, researchers, valid_map,
-        pop_size=200, max_generations=600, mutation_rate=0.65,
+        pop_size=80, max_generations=300, mutation_rate=0.65,
         config=DEFAULT_CONFIG, seed=seed, verbose=False,
     )
 
@@ -381,10 +381,13 @@ def plot_fitness_breakdown(output_path):
 def main():
     print("=== CHC Benchmark — Scalability & Realism ===\n")
 
+    # Instance sizes: (T, E, R, pop, gens)
+    # Lower ratios (pop/T ≈ 2-3) so convergence is visible, not instant
     configs = [
-        (15,  7, 22),
-        (30, 10, 40),
-        (60, 15, 75),
+        (15,  7, 20,  80, 300),
+        (30, 10, 35,  80, 300),
+        (45, 12, 50, 100, 300),
+        (60, 15, 65, 120, 300),
     ]
     n_seeds = 3
 
@@ -392,10 +395,8 @@ def main():
     results = {}
     all_realistic_convs = []
 
-    for T, E, R in configs:
-        pop = max(200, T * 5)
-        gens = min(max(500, T * 10), 1000)  # capped at 1000 for time
-        print(f"T={T:3d}  E={E:2d}  R={R:3d}  pop={pop:4d}  gens={gens:4d} ...")
+    for T, E, R, pop, gens in configs:
+        print(f"T={T:3d}  E={E:2d}  R={R:3d}  pop={pop:3d}  gens={gens:3d} ...")
 
         times, fits = [], []
         for seed in range(1, n_seeds + 1):
@@ -403,8 +404,12 @@ def main():
             elapsed, best_f, _ = run_one_instance(s, t, r, pop, gens, seed)
             times.append(elapsed)
             fits.append(best_f)
-            if T == 30:
-                # Capture one convergence for realistic plot
+
+        # Capture convergence for the largest instance (T=60, 5 runs)
+        if T == 60:
+            for seed in range(1, 6):  # 5 runs for better statistics
+                s, t, r = generate_realistic(E, T, R, prob_topics=0.2,
+                                              seed=seed)
                 valid = build_valid_researchers_per_talk(t, r, s)
                 _, _, conv, _, _, _ = chc(t, s, r, valid, pop, gens,
                                           mutation_rate=0.65,
