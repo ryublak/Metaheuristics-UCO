@@ -718,8 +718,95 @@ generated instance ($T = 30$) this gives $N_p = 200$ and $G = 600$,
 producing run times of 5--30 seconds on consumer hardware.
 
 % ============================================================
-\section{Conclusions}
+\section{Empirical Analysis}
 % ============================================================
+
+\subsection{Scalability}
+
+Figure~\ref{fig:scalability} shows execution time as a function of problem
+size. For a small instance ($T = 15$) the algorithm finishes in about
+2 seconds. At $T = 60$, with 300 individuals running for 600 generations,
+the time grows to roughly 20 seconds. The trend is roughly linear in $T$,
+since the number of fitness evaluations per generation scales with the
+population size ($N_p = \max(200, 5T)$).
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\textwidth]{scalability_time.png}
+  \caption{Execution time vs instance size (3 runs per bar, $\pm 1\sigma$).}
+  \label{fig:scalability}
+\end{figure}
+
+\subsection{Realistic Scenario}
+
+When run on realistic instances — without the preprocessing that forces
+all schools to the city and sets all topic requests to ``any'' — the
+algorithm faces structurally harder problems. Figure~\ref{fig:realistic}
+shows the average convergence over several runs on a $T = 30$ realistic
+instance. The fitness starts higher (because province schools and specific
+topics reduce the number of valid assignments) but the algorithm still
+converges to feasible solutions within the available generations.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.88\textwidth]{convergence_realistic.png}
+  \caption{Average convergence on realistic instances
+           ($T{=}30$, original generator, 3 runs).}
+  \label{fig:realistic}
+\end{figure}
+
+\subsection{Feasibility by Instance Size}
+
+Figure~\ref{fig:feasibility} confirms the algorithm's robustness: as the
+instance size grows, the proportion of runs that finish with zero hard
+penalties increases. At $T = 15$, two out of three runs were feasible;
+for $T \geq 30$, all runs reached a feasible solution. The forced
+desasignation at the end of the algorithm ensures that even the runs
+with hard penalties are cleaned up before the solution is delivered.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\textwidth]{feasibility.png}
+  \caption{Feasible vs infeasible runs per instance size.}
+  \label{fig:feasibility}
+\end{figure}
+
+\subsection{Impact of Preprocessing}
+
+Figure~\ref{fig:preprocessing} compares two runs of the same instance
+(seed 42, $T = 30$): one realistic (province schools, specific topics)
+and one after applying the preprocessing that forces every school to the
+city and accepts any topic. The realistic curve starts with a hard
+penalty spike because the travel constraint makes some province schools
+temporarily unserved; the preprocessed version avoids this entirely.
+The gap between the two curves represents the benefit of normalising
+the instance before the search.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.88\textwidth]{comparison_preprocessing.png}
+  \caption{Convergence comparison: realistic (red) vs preprocessed (blue).}
+  \label{fig:preprocessing}
+\end{figure}
+
+\subsection{Fitness Breakdown}
+
+When the coordinator inspects a solution, the raw fitness number
+($1270$ in the example shown in Figure~\ref{fig:breakdown}) is not
+self-explanatory. The pie chart decomposes it into its constituent
+penalties: unused-first-year and unused-traveller researchers account
+for most of the cost (the surplus-researcher regime, $R > T$, is always
+active); historical repetitions of the same school or province add a
+smaller fraction; and the tiny unassigned-talk penalty (10 per talk)
+places the remaining trips. Hard-constraint violations are zero,
+guaranteed by the forced desasignation.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.65\textwidth]{fitness_breakdown.png}
+  \caption{Penalty composition of the best solution on a $T{=}30$ instance.}
+  \label{fig:breakdown}
+\end{figure}
 
 This project tackled the \textbf{Talk Allocation Problem}, a type of
 Generalised Assignment Problem where talks must be matched to researchers
