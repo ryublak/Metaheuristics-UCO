@@ -38,7 +38,7 @@ def plot_convergence(data: dict, output_path: str | Path) -> None:
 
         gen_vals = generations[:len(avg)]
         ax.plot(gen_vals, avg, color="steelblue", linewidth=1.8,
-                label=f"Mean fitness (averaged over {data.get('num_runs', 'N')} runs)")
+                label=f"Mean feasible fitness (avg over {data.get('num_runs', 'N')} runs)")
 
         if std is not None:
             ax.fill_between(gen_vals,
@@ -56,8 +56,8 @@ def plot_convergence(data: dict, output_path: str | Path) -> None:
                 alpha=0.7, label="Cataclysmic restart (best run)")
 
         ax.set_xlabel("Generation")
-        ax.set_ylabel("Fitness (penalty, lower is better)")
-        ax.set_title("CHC Convergence — Talk Allocation")
+        ax.set_ylabel("Average feasible fitness (penalty)")
+        ax.set_title("CHC Convergence — Average Feasible Fitness")
         ax.legend(loc="upper right", fontsize=8)
         ax.grid(True, alpha=0.3)
 
@@ -70,7 +70,7 @@ def plot_convergence(data: dict, output_path: str | Path) -> None:
         fig, ax = plt.subplots(figsize=(9, 4.5))
 
         ax.plot(generations, conv, color="steelblue", linewidth=1.5,
-                marker=".", markersize=2.5, label="Best fitness")
+                marker=".", markersize=2.5, label="Avg feasible fitness")
 
         for g in data.get("restart_generations", []):
             ax.axvline(x=g, color="crimson", linestyle="--",
@@ -79,8 +79,8 @@ def plot_convergence(data: dict, output_path: str | Path) -> None:
                 alpha=0.7, label="Cataclysmic restart")
 
         ax.set_xlabel("Generation")
-        ax.set_ylabel("Fitness (penalty)")
-        ax.set_title("CHC Convergence — Talk Allocation")
+        ax.set_ylabel("Average feasible fitness (penalty)")
+        ax.set_title("CHC Convergence — Average Feasible Fitness")
         ax.legend(loc="upper right", fontsize=9)
         ax.grid(True, alpha=0.3)
 

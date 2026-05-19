@@ -666,23 +666,31 @@ more disruptive until an improvement is found.
 
 \subsection{Convergence Behaviour}
 
-Figure~\ref{fig:convergence} shows the average convergence curve over 4
+Figure~\ref{fig:convergence} shows the average \emph{feasible} fitness over 5
 independent runs on a synthetic instance with 18 talks, 5 schools, and 30
-researchers ($R > T$). The shaded band represents $\pm 1$ standard deviation.
-The initial high fitness (around 2900 on average) reflects soft-constraint
-penalties only — the 2-pass initialisation ensures every school receives at
-least one talk, so the hard $10^6$ penalty is never triggered. Over the first
-20--30 generations the algorithm improves the soft priorities, reaching a
-plateau around 1300. Red dashed lines mark cataclysmic restarts from the
-best run.
+researchers ($R > T$). Only individuals whose fitness is below $10^6$ (zero
+hard-constraint violations) are included in the average (see
+Section~\ref{sec:avgfeasible} for details on this metric), so the curve stays in
+the soft-penalty range and every fluctuation is visible. The shaded band
+represents $\pm 1$ standard deviation.
+
+Unlike a best-ever convergence curve, which is monotonic and would flatten
+after the first few generations, the \emph{average feasible fitness} captures
+the full population dynamics: cataclysmic restarts inject new mutant individuals,
+many of which are infeasible and are excluded from the average, while the
+remaining feasible subset is temporarily degraded. Selection gradually recovers
+the quality of the feasible sub-population, producing a characteristic sawtooth
+pattern. Red dashed lines mark the restart points of the best-performing run.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.92\textwidth]{convergence.png}
-  \caption{Average convergence over 4 runs on a synthetic instance
-           ($T{=}18, E{=}5, R{=}30$, 150 generations, pop.\ 40).
-           The shaded band shows $\pm 1\sigma$. Dashed vertical lines
-           mark cataclysmic restarts of the best run.}
+  \caption{Average feasible fitness over 5 runs on a synthetic instance
+           ($T{=}18$, $E{=}5$, $R{=}30$, 150 generations, pop.\ 40).
+           Only individuals with zero hard penalties ($f < 10^6$) are
+           averaged. The sawtooth pattern reflects cataclysmic restarts
+           (dashed vertical lines, best run) which temporarily degrade
+           the feasible sub-population, followed by recovery.}
   \label{fig:convergence}
 \end{figure}
 
@@ -775,24 +783,57 @@ with hard penalties are cleaned up before the solution is delivered.
 
 \subsection{Impact of Preprocessing}
 
-Figure~\ref{fig:preprocessing} compares two runs of the same instance
-(seed 42, $T = 30$, pop 80): one realistic (province schools, specific
-topics) and one after applying the preprocessing that forces every school
-to the city and accepts any topic. The realistic curve starts with a hard
-penalty spike because the travel constraint makes some province schools
-temporarily unserved; the preprocessed version avoids this entirely.
-The horizontal dashed line marks the fitness floor after the forced
-desasignation is applied — the realistic run delivers exactly the same
-quality as the preprocessed one after this post-processing step.
+Figure~\ref{fig:preprocessing} compares the average fitness (see
+Section~\ref{sec:avgfeasible}) on the same instance (seed 42, $T = 30$, pop 80)
+under two configurations, shown as vertically stacked subplots with independent
+y-axis scales. The top subplot corresponds to a realistic instance with province
+schools and $p_{\text{topic}} = 0.2$; the bottom subplot uses the preprocessing
+that forces every school to the city and accepts any topic
+($p_{\text{topic}} = 0$).
+
+The realistic configuration reveals a structural limitation: some province
+schools request talks whose topic and level cannot be matched by any
+researcher who is willing to travel. These schools are \emph{structurally
+infeasible} — no assignment can serve them. Our implementation addresses
+this by detecting such schools \emph{before} the search begins (computing
+$V(t) = \emptyset$ for all their talks) and excluding them from the
+$w_{\text{school\_no\_talk}}$ penalty calculation. As a result, the fitness
+function reflects optimisable penalties rather than unavoidable hard
+penalties, allowing the algorithm to properly minimise soft constraints
+on the remaining feasible schools.
+
+The preprocessed version avoids these hard-constraint violations entirely:
+all individuals are feasible from the start, so the metric reflects the true
+average feasible fitness and shows a descending sawtooth pattern from
+$\approx 2150$ to $\approx 800$ as the algorithm optimises soft priorities.
+Restart spikes are smaller and recovery is faster because the entire population
+is feasible.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.88\textwidth]{comparison_preprocessing.png}
-  \caption{Dual-axis comparison: fitness (solid, left axis, capped at 5000)
-           and unserved schools count (dashed, right axis).
-           Realistic (red) vs preprocessed (blue).}
+  \caption{Stacked subplots comparing population fitness for the same instance
+           under two configurations: realistic (top, province schools and
+           $p_{\text{topic}}\!=\!0.2$) and preprocessed (bottom, city schools
+           and any topic, $p_{\text{topic}}\!=\!0$). Each subplot has its own
+           y-axis scale. Structurally infeasible schools (those with no valid
+           researchers for any of their talks) are excluded from the penalty
+           calculation, allowing the realistic case to show meaningful fitness
+           values. Dashed lines mark cataclysmic restarts.}
   \label{fig:preprocessing}
 \end{figure}
+
+\subsection{Average Feasible Fitness}
+\label{sec:avgfeasible}
+
+A note on the metric used in Figures~\ref{fig:convergence}
+and~\ref{fig:preprocessing}: the curve plots the \emph{average fitness among
+individuals with zero hard penalties} (fitness $< 10^6$). If no feasible
+individual exists in a given generation — which only happens in the realistic
+scenario due to structural infeasibility — the curve falls back to the overall
+population average. This design ensures that the metric stays in a meaningful
+range whenever feasible solutions exist and honestly reports the hard-penalty
+floor otherwise.
 
 \subsection{Fitness Breakdown}
 

@@ -13,7 +13,7 @@ import copy
 from typing import Dict, List, Optional, Tuple
 
 from models import School, Talk, Researcher
-from fitness import compute_fitness, repair_gene, DEFAULT_CONFIG
+from fitness import compute_fitness, repair_gene, compute_infeasible_schools, DEFAULT_CONFIG
 
 
 # ---------------------------------------------------------------------------
@@ -30,9 +30,10 @@ def _build_random_chromosome(
     talks: List[Talk],
     valid_map: Dict[int, List[str]],
     researcher_ids: List[str],
+    researchers: Dict[str, Researcher],
     schools: Dict[str, School] | None = None,
 ) -> Chromosome:
-    """Generate one random feasible chromosome, respecting valid_map.
+    """Generate one random chromosome, respecting valid_map and capacity.
 
     Two-pass initialisation:
       1. Guarantee at least one talk per school (avoids the 1M hard penalty).
@@ -41,6 +42,10 @@ def _build_random_chromosome(
     T = len(talks)
     chrom: Chromosome = [-1] * T
     usage: Dict[str, int] = {}
+
+    def _can_take(r_str: str) -> bool:
+        r = researchers.get(r_str)
+        return r is not None and usage.get(r_str, 0) < r.max_talks
 
     # First pass: one talk per school (if schools dict provided)
     if schools is not None:
@@ -52,9 +57,8 @@ def _build_random_chromosome(
             for t in school_talks:
                 if chrom[t.talk_id] != -1:
                     continue
-                candidates = valid_map.get(t.talk_id, [])
-                candidates = [r for r in candidates
-                              if usage.get(r, 0) < 2]
+                candidates = [r for r in valid_map.get(t.talk_id, [])
+                              if _can_take(r)]
                 if not candidates:
                     continue
                 r_str = random.choice(candidates)
@@ -62,24 +66,18 @@ def _build_random_chromosome(
                 usage[r_str] = usage.get(r_str, 0) + 1
                 break  # one talk per school is enough
 
-    # Second pass: fill remaining talks greedily
+    # Second pass: fill remaining talks respecting capacity
     for talk in talks:
         if chrom[talk.talk_id] != -1:
             continue
-        candidates = valid_map.get(talk.talk_id, [])
+        candidates = [r for r in valid_map.get(talk.talk_id, [])
+                      if _can_take(r)]
         if not candidates:
             continue
         random.shuffle(candidates)
-        chosen = -1
-        for r_str in candidates:
-            if usage.get(r_str, 0) < 2:
-                chosen = researcher_ids.index(r_str)
-                usage[r_str] = usage.get(r_str, 0) + 1
-                break
-        if chosen == -1:
-            r_str = random.choice(candidates)
-            chosen = researcher_ids.index(r_str)
-        chrom[talk.talk_id] = chosen
+        r_str = candidates[0]
+        chrom[talk.talk_id] = researcher_ids.index(r_str)
+        usage[r_str] = usage.get(r_str, 0) + 1
 
     return chrom
 
@@ -94,6 +92,7 @@ def initialise_population(
     talks: List[Talk],
     valid_map: Dict[int, List[str]],
     researcher_ids: List[str],
+    researchers: Dict[str, Researcher],
     schools: Dict[str, School] | None = None,
 ) -> List[Chromosome]:
     """
@@ -106,7 +105,7 @@ def initialise_population(
     min_hamming = max(1, len(talks) // 10)  # at least 10% different genes
 
     while len(population) < pop_size and attempts < max_attempts:
-        candidate = _build_random_chromosome(talks, valid_map, researcher_ids, schools)
+        candidate = _build_random_chromosome(talks, valid_map, researcher_ids, researchers, schools)
         too_similar = any(hamming_distance(candidate, existing) < min_hamming
                           for existing in population)
         if not too_similar:
@@ -115,7 +114,7 @@ def initialise_population(
 
     # Fill remainder without diversity constraint if needed
     while len(population) < pop_size:
-        population.append(_build_random_chromosome(talks, valid_map, researcher_ids, schools))
+        population.append(_build_random_chromosome(talks, valid_map, researcher_ids, researchers, schools))
 
     return population
 
@@ -336,7 +335,7 @@ def chc(
         elite_size:     number of top unique solutions to keep in the elite set.
 
     Returns:
-        (best_chromosome, best_fitness, convergence_curve, elite_list,
+        (best_chromosome, best_fitness, avg_fitness_curve, elite_list,
          restart_generations, final_fitness_values, gen_best_fitness)
     """
     if seed is not None:
@@ -352,11 +351,18 @@ def chc(
     threshold = T // 4
 
     # Initialise population
-    population = initialise_population(pop_size, talks, valid_map, researcher_ids, schools)
+    population = initialise_population(pop_size, talks, valid_map, researcher_ids, researchers, schools)
+
+    # Repair initial population so all individuals are free of hard penalties
+    population = [repair_chromosome(c, researcher_ids, researchers, valid_map)
+                  for c in population]
+
+    # Compute structurally infeasible schools (all their talks have V(t) = ∅)
+    infeasible_schools = compute_infeasible_schools(talks, schools, valid_map)
 
     # Evaluate
     def evaluate(chrom: Chromosome) -> float:
-        return compute_fitness(chrom, talks, schools, researchers, valid_map, config)
+        return compute_fitness(chrom, talks, schools, researchers, valid_map, config, infeasible_schools)
 
     fitness_values = [evaluate(c) for c in population]
 
@@ -376,7 +382,9 @@ def chc(
             if len(elite_set) >= elite_size:
                 break
 
-    convergence: List[float] = [best_fitness]
+    feasible0 = [f for f in fitness_values if f < 1_000_000]
+    convergence: List[float] = [(sum(feasible0) / len(feasible0)) if feasible0
+                                else (sum(fitness_values) / len(fitness_values))]
     gen_best: List[float] = [best_fitness]
     restarts = 0
     stale_restarts = 0
@@ -447,8 +455,6 @@ def chc(
                 if len(elite_set) >= elite_size:
                     break
 
-        convergence.append(best_fitness)
-
         # Cataclysmic restart when threshold reaches 0
         # Also restart when stagnated (no improvement for too long)
         trigger_restart = (threshold <= 0) or (stagnation_count >= stagnation_limit)
@@ -482,6 +488,10 @@ def chc(
             population[0] = copy.copy(best_chrom)
             threshold = T // 4  # reset threshold
             stagnation_count = 0
+
+        feasible = [f for f in fitness_values if f < 1_000_000]
+        convergence.append((sum(feasible) / len(feasible)) if feasible
+                           else (sum(fitness_values) / len(fitness_values)))
 
         if verbose and gen % 20 == 0:
             print(f"  Gen {gen:4d} | threshold={threshold} | best_fit={best_fitness:.2f} | restarts={restarts}")

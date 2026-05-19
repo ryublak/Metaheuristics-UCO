@@ -131,6 +131,7 @@ def compute_fitness(
     researchers: Dict[str, Researcher],
     valid_map: Dict[int, List[str]],
     config: Dict[str, float] | None = None,
+    infeasible_schools: set | None = None,
 ) -> float:
     """
     Compute fitness for a chromosome (minimisation — lower is better).
@@ -149,6 +150,9 @@ def compute_fitness(
     """
     if config is None:
         config = DEFAULT_CONFIG
+
+    if infeasible_schools is None:
+        infeasible_schools = set()
 
     num_talks = len(talks)
     num_researchers = len(researchers)
@@ -178,9 +182,12 @@ def compute_fitness(
             fitness += config["w_location_mismatch"]
 
     # --- Hard: school without talk when R >= T ---
+    # Exclude structurally infeasible schools (all their talks have V(t) = ∅)
     if num_researchers >= num_talks:
         assigned_schools = {talks[t_id].school_id for t_id, r_str in enumerate(resolved) if r_str is not None}
         for s_id in schools:
+            if s_id in infeasible_schools:
+                continue
             if s_id not in assigned_schools:
                 fitness += config["w_school_no_talk"]
 
@@ -214,6 +221,35 @@ def compute_fitness(
     fitness += n_unassigned * config.get("w_unassigned_talk", 10)
 
     return fitness
+
+
+# ---------------------------------------------------------------------------
+# Helper to compute structurally infeasible schools
+# ---------------------------------------------------------------------------
+
+def compute_infeasible_schools(
+    talks: List[Talk],
+    schools: Dict[str, School],
+    valid_map: Dict[int, List[str]],
+) -> set:
+    """
+    Compute the set of schools that are structurally infeasible — i.e.,
+    ALL their talks have no valid researchers (V(t) = ∅).
+
+    These schools cannot receive any talk regardless of the assignment,
+    so we exclude them from the w_school_no_talk hard penalty.
+    """
+    school_to_talks: Dict[str, List[int]] = {}
+    for t in talks:
+        school_to_talks.setdefault(t.school_id, []).append(t.talk_id)
+
+    infeasible: set = set()
+    for s_id, talk_ids in school_to_talks.items():
+        all_empty = all(len(valid_map.get(tid, [])) == 0 for tid in talk_ids)
+        if all_empty:
+            infeasible.add(s_id)
+
+    return infeasible
 
 
 # ---------------------------------------------------------------------------

@@ -230,59 +230,51 @@ def plot_comparison_preprocessing(output_path):
     num_schools, num_talks, num_researchers = 10, 30, 35
     pop, gens = 80, 300
 
-    # Realistic (no preprocessing)
     s_r, t_r, r_r = generate_realistic(num_schools, num_talks,
                                        num_researchers, prob_topics=0.2,
                                        seed=seed)
     valid_r = build_valid_researchers_per_talk(t_r, r_r, s_r)
-    _, _, conv_r, _, _, _, gen_best_r = chc(t_r, s_r, r_r, valid_r, pop, gens,
+    _, _, conv_r, _, restarts_r, _, _ = chc(t_r, s_r, r_r, valid_r, pop, gens,
                                 mutation_rate=0.65, config=DEFAULT_CONFIG,
                                 seed=seed, verbose=False)
 
-    # Preprocessed (forced city + prob_topics=0)
     s_p, t_p, r_p = generate_realistic(num_schools, num_talks,
                                        num_researchers, prob_topics=0.0,
                                        seed=seed)
     for s in s_p.values():
         s.location = "city"
     valid_p = build_valid_researchers_per_talk(t_p, r_p, s_p)
-    _, _, conv_p, _, _, _, gen_best_p = chc(t_p, s_p, r_p, valid_p, pop, gens,
+    _, _, conv_p, _, restarts_p, _, _ = chc(t_p, s_p, r_p, valid_p, pop, gens,
                                 mutation_rate=0.65, config=DEFAULT_CONFIG,
                                 seed=seed, verbose=False)
 
-    fig, ax = plt.subplots(figsize=(9, 4.8))
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 5.5), sharex=True)
+
     gen_r = list(range(len(conv_r)))
     gen_p = list(range(len(conv_p)))
 
-    # Left axis: fitness (capped at 5000 to clip 1M peaks)
-    # Right axis: unserved schools count (0..E)
-    ax1 = fig.gca()
-    ax2 = ax1.twinx()
-
-    ax1.plot(gen_r, conv_r, color="crimson", linewidth=1.4,
-             label="Fitness — Realistic")
-    ax1.plot(gen_p, conv_p, color="steelblue", linewidth=1.4,
-             label="Fitness — Preprocessed")
-
-    unserved_r = [max(0, int(f // 1_000_000)) for f in gen_best_r]
-    unserved_p = [max(0, int(f // 1_000_000)) for f in gen_best_p]
-    ax2.plot(gen_r, unserved_r, color="crimson", linestyle="--", linewidth=1.0,
-             alpha=0.6, label="Unserved — Realistic")
-    ax2.plot(gen_p, unserved_p, color="steelblue", linestyle="--", linewidth=1.0,
-             alpha=0.6, label="Unserved — Preprocessed")
-
-    ax1.set_ylim(0, 5000)
-    ax2.set_ylim(-0.5, max(5, max(unserved_r + unserved_p)) + 0.5)
-    ax1.set_xlabel("Generation")
-    ax1.set_ylabel("Fitness (penalty, capped at 5000)")
-    ax2.set_ylabel("Unserved schools", color="gray")
-    ax2.tick_params(axis="y", labelcolor="gray")
-    ax1.set_title("Impact of Preprocessing — Same Instance")
-
-    lines1, labels1 = ax1.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines1 + lines2, labels1 + labels2, loc="upper right", fontsize=7)
+    ax1.plot(gen_r, conv_r, color="crimson", linewidth=1.2,
+             label="Realistic (province, topics=0.2)")
+    for g in restarts_r:
+        ax1.axvline(x=g, color="crimson", linestyle="--", linewidth=0.8,
+                    alpha=0.5)
+    ax1.set_ylabel("Avg feasible fitness", fontsize=9)
+    ax1.legend(fontsize=8, loc="upper right")
     ax1.grid(True, alpha=0.3)
+    ax1.set_title("Realistic instance", fontsize=10)
+
+    ax2.plot(gen_p, conv_p, color="steelblue", linewidth=1.2,
+             label="Preprocessed (city, any topic)")
+    for g in restarts_p:
+        ax2.axvline(x=g, color="steelblue", linestyle="--", linewidth=0.8,
+                    alpha=0.5)
+    ax2.set_xlabel("Generation")
+    ax2.set_ylabel("Avg feasible fitness", fontsize=9)
+    ax2.legend(fontsize=8, loc="upper right")
+    ax2.grid(True, alpha=0.3)
+    ax2.set_title("Preprocessed instance", fontsize=10)
+
+    fig.suptitle("Impact of Preprocessing — Same Seed", fontsize=12, fontweight="bold")
     fig.tight_layout()
     fig.savefig(output_path, dpi=150)
     plt.close(fig)
