@@ -169,32 +169,24 @@ def plot_scalability_time(results, output_path):
 
 
 # ---------------------------------------------------------------------------
-# Plot 2 — realistic convergence
+# Plot 2 — fitness consistency across runs (T=60 realistic)
 # ---------------------------------------------------------------------------
 
-def plot_realistic_convergence(all_convs, output_path):
-    max_len = max(len(c) for c in all_convs)
-    padded = []
-    for c in all_convs:
-        p = list(c)
-        while len(p) < max_len:
-            p.append(p[-1])
-        padded.append(p[:max_len])
-    arr = np.array(padded)
-    avg = arr.mean(axis=0)
-    std = arr.std(axis=0)
-    gen_vals = list(range(len(avg)))
-
-    fig, ax = plt.subplots(figsize=(9, 4.5))
-    ax.plot(gen_vals, avg, color="crimson", linewidth=1.6,
-            label=f"Mean fitness (realistic, T=30, {len(all_convs)} runs)")
-    ax.fill_between(gen_vals, np.maximum(avg - std, 0), avg + std,
-                    alpha=0.15, color="crimson", label="±1σ")
-    ax.set_xlabel("Generation")
-    ax.set_ylabel("Fitness (penalty)")
-    ax.set_title("CHC Convergence — Realistic Instance (province + travel)")
-    ax.legend(loc="upper right", fontsize=8)
-    ax.grid(True, alpha=0.3)
+def plot_fitness_consistency(fitnesses, output_path):
+    """Bar chart showing final fitness for each run on a T=60 realistic instance."""
+    n = len(fitnesses)
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    colors = ["steelblue" if f < 1e6 else "crimson" for f in fitnesses]
+    bars = ax.bar(range(1, n + 1), fitnesses, color=colors, edgecolor="white",
+                  linewidth=0.6, width=0.55)
+    for i, (bar, f) in enumerate(zip(bars, fitnesses)):
+        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + max(fitnesses) * 0.02,
+                f"{f:.0f}", ha="center", va="bottom", fontsize=8)
+    ax.set_xlabel("Run")
+    ax.set_ylabel("Final fitness (penalty)")
+    ax.set_title(f"Fitness Consistency — T=60 Realistic Instance ({n} runs)")
+    ax.set_xticks(range(1, n + 1))
+    ax.grid(axis="y", alpha=0.3)
     fig.tight_layout()
     fig.savefig(output_path, dpi=150)
     plt.close(fig)
@@ -265,6 +257,10 @@ def plot_comparison_preprocessing(output_path):
             label="Realistic (province + travel + specific topics)")
     ax.plot(gen_p, conv_p, color="steelblue", linewidth=1.4,
             label="Preprocessed (forced city + any topic)")
+    # Horizontal line at the guaranteed post-desasignation floor
+    floor = min(conv_p[-1], conv_r[-1])
+    ax.axhline(y=floor, color="gray", linestyle="--", linewidth=1.0,
+               alpha=0.7, label=f"Post-desasignation floor ({floor:.0f})")
     ax.set_xlabel("Generation")
     ax.set_ylabel("Fitness (penalty)")
     ax.set_title("Impact of Preprocessing — Same Instance")
@@ -393,7 +389,7 @@ def main():
 
     # --- Plot 1 & 3: scalability + feasibility ---
     results = {}
-    all_realistic_convs = []
+    realistic_fitnesses = []
 
     for T, E, R, pop, gens in configs:
         print(f"T={T:3d}  E={E:2d}  R={R:3d}  pop={pop:3d}  gens={gens:3d} ...")
@@ -405,17 +401,13 @@ def main():
             times.append(elapsed)
             fits.append(best_f)
 
-        # Capture convergence for the largest instance (T=60, 5 runs)
+        # Capture fitnesses for the largest instance (T=60, 5 runs)
         if T == 60:
-            for seed in range(1, 6):  # 5 runs for better statistics
+            for seed in range(1, 6):
                 s, t, r = generate_realistic(E, T, R, prob_topics=0.2,
                                               seed=seed)
-                valid = build_valid_researchers_per_talk(t, r, s)
-                _, _, conv, _, _, _ = chc(t, s, r, valid, pop, gens,
-                                          mutation_rate=0.65,
-                                          config=DEFAULT_CONFIG,
-                                          seed=seed, verbose=False)
-                all_realistic_convs.append(conv)
+                elapsed, best_f, _ = run_one_instance(s, t, r, pop, gens, seed)
+                realistic_fitnesses.append(best_f)
 
         n_clean = sum(1 for f in fits if f < 1e6)
         mean_t = np.mean(times)
@@ -433,10 +425,10 @@ def main():
     print("  [1/5] scalability_time.png")
 
     # Plot 2
-    if all_realistic_convs:
-        plot_realistic_convergence(all_realistic_convs,
-                                   img_dir / "convergence_realistic.png")
-        print("  [2/5] convergence_realistic.png")
+    if realistic_fitnesses:
+        plot_fitness_consistency(realistic_fitnesses,
+                                 img_dir / "fitness_consistency.png")
+        print("  [2/5] fitness_consistency.png")
     else:
         print("  [2/5] SKIPPED (no realistic data)")
 

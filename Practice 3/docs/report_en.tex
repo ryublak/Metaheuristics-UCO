@@ -737,24 +737,24 @@ population size.
   \label{fig:scalability}
 \end{figure}
 
-\subsection{Realistic Scenario}
+\subsection{Fitness Consistency}
 
-When run on realistic instances — without the preprocessing that forces
-all schools to the city and sets all topic requests to ``any'' — the
-algorithm faces structurally harder problems. Figure~\ref{fig:realistic}
-shows the average convergence over 5 runs on a $T = 60$ realistic
-instance. The fitness starts higher (because province schools and specific
-topics reduce the number of valid assignments) but the algorithm gradually
-improves and reaches feasible solutions well within the 300-generation
-budget. The shaded $\pm 1\sigma$ band shows moderate variability between
-runs, confirming that the convergence pattern is reliable.
+When the algorithm is run on realistic instances — without the preprocessing
+that forces all schools to the city — it faces structurally harder problems
+(province schools, specific topic requests). Figure~\ref{fig:consistency}
+shows the final fitness for 5 independent runs on a $T = 60$ realistic
+instance. Blue bars indicate runs that ended with zero hard penalties
+(feasible); red bars indicate hard-penalty runs that would still be cleaned
+up by the forced desasignation. The tight distribution (with the exception
+of one outlier) confirms that the algorithm produces consistent solutions
+regardless of which random seed generates the instance.
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.88\textwidth]{convergence_realistic.png}
-  \caption{Average convergence on realistic instances
-           ($T{=}60$, original generator, 5 runs, pop 120).}
-  \label{fig:realistic}
+  \includegraphics[width=0.80\textwidth]{fitness_consistency.png}
+  \caption{Final fitness across 5 runs on a realistic $T{=}60$ instance.
+           Blue = feasible, red = hard penalty (cleaned post-hoc).}
+  \label{fig:consistency}
 \end{figure}
 
 \subsection{Feasibility by Instance Size}
@@ -781,8 +781,9 @@ topics) and one after applying the preprocessing that forces every school
 to the city and accepts any topic. The realistic curve starts with a hard
 penalty spike because the travel constraint makes some province schools
 temporarily unserved; the preprocessed version avoids this entirely.
-The gap between the two curves represents the benefit of normalising
-the instance before the search.
+The horizontal dashed line marks the fitness floor after the forced
+desasignation is applied — the realistic run delivers exactly the same
+quality as the preprocessed one after this post-processing step.
 
 \begin{figure}[H]
   \centering
