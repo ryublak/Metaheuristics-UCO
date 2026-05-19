@@ -60,7 +60,7 @@ def main():
             print(f"  Run {run_idx} (seed {seed}): {n_inf} infeasible, retrying …")
             continue
 
-        best_c, best_f, conv, elite, restarts, final_fits = chc(
+        best_c, best_f, conv, elite, restarts, final_fits, _gen_best = chc(
             talks, schools, researchers, valid_map,
             pop_size=pop_size, max_generations=generations,
             mutation_rate=mutation_rate, config=DEFAULT_CONFIG,

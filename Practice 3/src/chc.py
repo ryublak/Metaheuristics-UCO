@@ -318,7 +318,7 @@ def chc(
     seed: Optional[int] = None,
     verbose: bool = True,
     elite_size: int = 5,
-) -> Tuple[Chromosome, float, List[float], List[Tuple[Chromosome, float]], List[int], List[float]]:
+) -> Tuple[Chromosome, float, List[float], List[Tuple[Chromosome, float]], List[int], List[float], List[float]]:
     """
     Run the CHC algorithm for talk allocation.
 
@@ -337,7 +337,7 @@ def chc(
 
     Returns:
         (best_chromosome, best_fitness, convergence_curve, elite_list,
-         restart_generations, final_fitness_values)
+         restart_generations, final_fitness_values, gen_best_fitness)
     """
     if seed is not None:
         random.seed(seed)
@@ -377,6 +377,7 @@ def chc(
                 break
 
     convergence: List[float] = [best_fitness]
+    gen_best: List[float] = [best_fitness]
     restarts = 0
     stale_restarts = 0
     stagnation_count = 0
@@ -424,6 +425,7 @@ def chc(
 
         # Update global best
         gen_best_idx = min(range(len(fitness_values)), key=lambda i: fitness_values[i])
+        gen_best.append(fitness_values[gen_best_idx])
         if fitness_values[gen_best_idx] < best_fitness:
             best_fitness = fitness_values[gen_best_idx]
             best_chrom = copy.copy(population[gen_best_idx])
@@ -501,4 +503,4 @@ def chc(
             clean_elite.append((c_clean, f_clean))
             seen_clean.add(t)
 
-    return best_chrom, best_fitness, convergence, clean_elite, restart_generations, fitness_values
+    return best_chrom, best_fitness, convergence, clean_elite, restart_generations, fitness_values, gen_best

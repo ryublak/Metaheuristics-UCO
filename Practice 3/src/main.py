@@ -157,7 +157,7 @@ def main():
     print(f"\n  Running CHC (pop={pop}, gen={gens}, "
           f"mutation_rate={args.mutation_rate}, seed={args.seed})…\n")
     t0 = time.time()
-    best_chrom, best_fitness, convergence, elite_set, restart_gens, _final_fitnesses = chc(
+    best_chrom, best_fitness, convergence, elite_set, restart_gens, _final_fitnesses, _gen_best = chc(
         talks=talks,
         schools=schools,
         researchers=researchers,

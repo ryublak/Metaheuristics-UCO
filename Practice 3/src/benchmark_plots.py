@@ -135,7 +135,7 @@ def run_one_instance(schools, talks, researchers, pop, gens, seed):
     """Run CHC on a pre-built instance. Returns (time_s, fitness, elite)."""
     valid_map = build_valid_researchers_per_talk(talks, researchers, schools)
     t0 = time.time()
-    _, best_f, conv, elite, _, _ = chc(
+    _, best_f, conv, elite, _, _, gen_best = chc(
         talks, schools, researchers, valid_map,
         pop_size=pop, max_generations=gens, mutation_rate=0.65,
         config=DEFAULT_CONFIG, seed=seed, verbose=False,
@@ -235,7 +235,7 @@ def plot_comparison_preprocessing(output_path):
                                        num_researchers, prob_topics=0.2,
                                        seed=seed)
     valid_r = build_valid_researchers_per_talk(t_r, r_r, s_r)
-    _, _, conv_r, _, _, _ = chc(t_r, s_r, r_r, valid_r, pop, gens,
+    _, _, conv_r, _, _, _, gen_best_r = chc(t_r, s_r, r_r, valid_r, pop, gens,
                                 mutation_rate=0.65, config=DEFAULT_CONFIG,
                                 seed=seed, verbose=False)
 
@@ -246,26 +246,43 @@ def plot_comparison_preprocessing(output_path):
     for s in s_p.values():
         s.location = "city"
     valid_p = build_valid_researchers_per_talk(t_p, r_p, s_p)
-    _, _, conv_p, _, _, _ = chc(t_p, s_p, r_p, valid_p, pop, gens,
+    _, _, conv_p, _, _, _, gen_best_p = chc(t_p, s_p, r_p, valid_p, pop, gens,
                                 mutation_rate=0.65, config=DEFAULT_CONFIG,
                                 seed=seed, verbose=False)
 
     fig, ax = plt.subplots(figsize=(9, 4.8))
     gen_r = list(range(len(conv_r)))
     gen_p = list(range(len(conv_p)))
-    ax.plot(gen_r, conv_r, color="crimson", linewidth=1.4,
-            label="Realistic (province + travel + specific topics)")
-    ax.plot(gen_p, conv_p, color="steelblue", linewidth=1.4,
-            label="Preprocessed (forced city + any topic)")
-    # Horizontal line at the guaranteed post-desasignation floor
-    floor = min(conv_p[-1], conv_r[-1])
-    ax.axhline(y=floor, color="gray", linestyle="--", linewidth=1.0,
-               alpha=0.7, label=f"Post-desasignation floor ({floor:.0f})")
-    ax.set_xlabel("Generation")
-    ax.set_ylabel("Fitness (penalty)")
-    ax.set_title("Impact of Preprocessing — Same Instance")
-    ax.legend(loc="upper right", fontsize=8)
-    ax.grid(True, alpha=0.3)
+
+    # Left axis: fitness (capped at 5000 to clip 1M peaks)
+    # Right axis: unserved schools count (0..E)
+    ax1 = fig.gca()
+    ax2 = ax1.twinx()
+
+    ax1.plot(gen_r, conv_r, color="crimson", linewidth=1.4,
+             label="Fitness — Realistic")
+    ax1.plot(gen_p, conv_p, color="steelblue", linewidth=1.4,
+             label="Fitness — Preprocessed")
+
+    unserved_r = [max(0, int(f // 1_000_000)) for f in gen_best_r]
+    unserved_p = [max(0, int(f // 1_000_000)) for f in gen_best_p]
+    ax2.plot(gen_r, unserved_r, color="crimson", linestyle="--", linewidth=1.0,
+             alpha=0.6, label="Unserved — Realistic")
+    ax2.plot(gen_p, unserved_p, color="steelblue", linestyle="--", linewidth=1.0,
+             alpha=0.6, label="Unserved — Preprocessed")
+
+    ax1.set_ylim(0, 5000)
+    ax2.set_ylim(-0.5, max(5, max(unserved_r + unserved_p)) + 0.5)
+    ax1.set_xlabel("Generation")
+    ax1.set_ylabel("Fitness (penalty, capped at 5000)")
+    ax2.set_ylabel("Unserved schools", color="gray")
+    ax2.tick_params(axis="y", labelcolor="gray")
+    ax1.set_title("Impact of Preprocessing — Same Instance")
+
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc="upper right", fontsize=7)
+    ax1.grid(True, alpha=0.3)
     fig.tight_layout()
     fig.savefig(output_path, dpi=150)
     plt.close(fig)
@@ -284,7 +301,7 @@ def plot_fitness_breakdown(output_path):
     valid_map = build_valid_researchers_per_talk(talks, researchers, schools)
     r_ids = list(researchers.keys())
 
-    best_c, best_f, _, _, _, _ = chc(
+    best_c, best_f, _, _, _, _, _gen_best = chc(
         talks, schools, researchers, valid_map,
         pop_size=80, max_generations=300, mutation_rate=0.65,
         config=DEFAULT_CONFIG, seed=seed, verbose=False,
