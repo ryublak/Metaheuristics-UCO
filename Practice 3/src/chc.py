@@ -8,7 +8,6 @@ Reference: Eshelman (1991) "The CHC Adaptive Search Algorithm"
 """
 
 import random
-import math
 import copy
 from typing import Dict, List, Optional, Tuple
 

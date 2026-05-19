@@ -25,15 +25,28 @@ from generate_instance import generate_instance
 from plot_results import plot_all
 
 
-def main():
+def main(fast: bool = False):
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--fast", action="store_true", help="Quick run")
+    args, _ = parser.parse_known_args()
+    fast = fast or args.fast
+
     num_schools = 5
     num_talks = 18
     num_researchers = 30
     prob_topics = 0.05
-    pop_size = 40
-    generations = 150
-    mutation_rate = 0.50
-    num_runs = 5
+
+    if fast:
+        pop_size = 20
+        generations = 30
+        mutation_rate = 0.50
+        num_runs = 1
+    else:
+        pop_size = 40
+        generations = 150
+        mutation_rate = 0.50
+        num_runs = 5
 
     print(f"Running {num_runs} CHC iterations for averaged convergence …")
 
@@ -43,7 +56,8 @@ def main():
     all_best = []
 
     # Use seeds that produce feasible instances
-    seeds = [8, 20, 42, 67, 91]
+    all_seeds = [8, 20, 42, 67, 91]
+    seeds = all_seeds[:num_runs] if fast else all_seeds
 
     for run_idx, seed in enumerate(seeds):
         schools, talks, researchers = generate_instance(

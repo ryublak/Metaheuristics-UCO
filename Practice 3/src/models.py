@@ -7,7 +7,7 @@ Three core entities:
   - Researcher: a researcher who offers to give a talk.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 

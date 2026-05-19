@@ -224,6 +224,64 @@ def compute_fitness(
 
 
 # ---------------------------------------------------------------------------
+# Penalty breakdown for analysis / visualization
+# ---------------------------------------------------------------------------
+
+def compute_penalty_breakdown(
+    chromosome: List[int],
+    talks: List[Talk],
+    schools: Dict[str, School],
+    researchers: Dict[str, Researcher],
+    config: Dict[str, float] | None = None,
+) -> Dict[str, float]:
+    """
+    Compute individual penalty components for analysis/visualization.
+
+    Returns a dict with:
+    - "Unused researchers": penalty for first-year or traveller researchers not used
+    - "Historical": penalty for repeating same school or province
+    - "Unserved schools (soft)": penalty for schools with no talk
+    - "Unassigned talks": penalty for unassigned talks
+    """
+    if config is None:
+        config = DEFAULT_CONFIG
+
+    researcher_ids = list(researchers.keys())
+
+    def resolve(idx: int) -> str | None:
+        if idx == -1 or idx >= len(researcher_ids):
+            return None
+        return researcher_ids[idx]
+
+    resolved = [resolve(idx) for idx in chromosome]
+    num_talks = len(talks)
+    num_researchers = len(researchers)
+
+    n_unassigned = sum(1 for r_str in resolved if r_str is None)
+
+    unused_penalty = _penalty_researcher_soft(
+        resolved, researchers, num_talks, config,
+    )
+
+    hist_penalty = _penalty_historical(
+        resolved, talks, schools, researchers, config,
+    )
+
+    unserved_penalty = _penalty_unserved_school_soft(
+        resolved, talks, schools, config,
+    )
+
+    unassigned_penalty = n_unassigned * config.get("w_unassigned_talk", 10)
+
+    return {
+        "Unused researchers": unused_penalty,
+        "Historical": hist_penalty,
+        "Unserved schools (soft)": unserved_penalty,
+        "Unassigned talks": unassigned_penalty,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Helper to compute structurally infeasible schools
 # ---------------------------------------------------------------------------
 

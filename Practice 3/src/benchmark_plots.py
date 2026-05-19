@@ -26,105 +26,15 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from data_generator_talks11f.schools_functions import generate_random_school
-from data_generator_talks11f.talks_functions import (
-    generate_random_topic,
-    generate_random_talk_level,
-)
-from data_generator_talks11f.proposed_talks_functions import (
-    generate_random_repeat_talk,
-    generate_random_travelling,
-    generate_random_first_participation,
-    generate_random_previous_talk_province,
-)
 from models import School, Talk, Researcher
 from data_loader import build_valid_researchers_per_talk
-from fitness import compute_fitness, DEFAULT_CONFIG
+from fitness import compute_fitness, compute_penalty_breakdown, DEFAULT_CONFIG
 from chc import chc
+from generate_instance import generate_instance
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-
-
-# ---------------------------------------------------------------------------
-# Realistic instance generator (professor's logic, no preprocessing)
-# ---------------------------------------------------------------------------
-
-def generate_realistic(num_schools, num_talks, num_researchers,
-                       prob_topics=0.2, seed=None):
-    """Generate using the professor's original logic — province schools,
-       travel constraints, and specific topics are all active."""
-    if seed is not None:
-        np.random.seed(seed)
-
-    schools = {}
-    for i in range(num_schools):
-        s = generate_random_school()
-        sid = f"school{i + 1}"
-        schools[sid] = School(
-            school_id=sid, location=s["location"],
-            disadvantaged_area=s["disadvantaged_area"],
-            school_type=s["school_type"], first_year=s["first_year"],
-        )
-
-    school_ids = list(schools.keys())
-
-    talks = []
-    seen = set()
-    # Guarantee one talk per school
-    for sid in school_ids:
-        topic = generate_random_topic() if np.random.rand() < prob_topics else "any"
-        level = generate_random_talk_level()
-        talks.append(Talk(talk_id=len(talks), topic=topic, level=level, school_id=sid))
-
-    max_attempts = num_talks * 10
-    attempts = 0
-    while len(talks) < num_talks and attempts < max_attempts:
-        sid = np.random.choice(school_ids)
-        topic = generate_random_topic() if np.random.rand() < prob_topics else "any"
-        level = generate_random_talk_level()
-        key = (sid, topic, level)
-        if key not in seen:
-            seen.add(key)
-            talks.append(Talk(talk_id=len(talks), topic=topic, level=level, school_id=sid))
-        attempts += 1
-    while len(talks) < num_talks:
-        sid = np.random.choice(school_ids)
-        topic = generate_random_topic() if np.random.rand() < prob_topics else "any"
-        level = generate_random_talk_level()
-        talks.append(Talk(talk_id=len(talks), topic=topic, level=level, school_id=sid))
-
-    province_schools = [s for s in school_ids if schools[s].location == "province"]
-    city_schools = [s for s in school_ids if schools[s].location == "city"]
-
-    researchers = {}
-    for i in range(num_researchers):
-        repeat = generate_random_repeat_talk()
-        can_travel = generate_random_travelling()
-        first_part = generate_random_first_participation()
-        prev_prov = generate_random_previous_talk_province()
-        topic = generate_random_topic()
-        level = generate_random_talk_level()
-
-        if prev_prov and province_schools:
-            prev_school = str(np.random.choice(province_schools))
-        elif city_schools:
-            prev_school = str(np.random.choice(city_schools))
-            prev_prov = False
-        else:
-            prev_school = str(np.random.choice(school_ids))
-            prev_prov = False
-
-        max_t = 2 if repeat else 1
-        researchers[f"researcher{i + 1}"] = Researcher(
-            researcher_id=f"researcher{i + 1}", topic=topic, level=level,
-            can_travel=can_travel, first_participation=first_part,
-            previous_talk_province=prev_prov, previous_school=prev_school,
-            max_talks=max_t,
-        )
-
-    return schools, talks, researchers
 
 
 # ---------------------------------------------------------------------------
@@ -230,17 +140,17 @@ def plot_comparison_preprocessing(output_path):
     num_schools, num_talks, num_researchers = 10, 30, 35
     pop, gens = 80, 300
 
-    s_r, t_r, r_r = generate_realistic(num_schools, num_talks,
-                                       num_researchers, prob_topics=0.2,
-                                       seed=seed)
+    s_r, t_r, r_r = generate_instance(
+        num_schools, num_talks, num_researchers,
+        prob_topics=0.2, seed=seed, balance_levels=False)
     valid_r = build_valid_researchers_per_talk(t_r, r_r, s_r)
     _, _, conv_r, _, restarts_r, _, _ = chc(t_r, s_r, r_r, valid_r, pop, gens,
                                 mutation_rate=0.65, config=DEFAULT_CONFIG,
                                 seed=seed, verbose=False)
 
-    s_p, t_p, r_p = generate_realistic(num_schools, num_talks,
-                                       num_researchers, prob_topics=0.0,
-                                       seed=seed)
+    s_p, t_p, r_p = generate_instance(
+        num_schools, num_talks, num_researchers,
+        prob_topics=0.0, seed=seed, balance_levels=False)
     for s in s_p.values():
         s.location = "city"
     valid_p = build_valid_researchers_per_talk(t_p, r_p, s_p)
@@ -286,8 +196,8 @@ def plot_comparison_preprocessing(output_path):
 
 def plot_fitness_breakdown(output_path):
     seed = 42
-    schools, talks, researchers = generate_realistic(10, 30, 35,
-                                                     prob_topics=0.0, seed=seed)
+    schools, talks, researchers = generate_instance(
+        10, 30, 35, prob_topics=0.0, seed=seed, balance_levels=False)
     for s in schools.values():
         s.location = "city"
     valid_map = build_valid_researchers_per_talk(talks, researchers, schools)
@@ -299,60 +209,9 @@ def plot_fitness_breakdown(output_path):
         config=DEFAULT_CONFIG, seed=seed, verbose=False,
     )
 
-    resolved = [r_ids[idx] if idx != -1 and idx < len(r_ids) else None
-                for idx in best_c]
-    n_assigned = sum(1 for r in resolved if r is not None)
-    n_unassigned = sum(1 for r in resolved if r is None)
-
-    # Count soft penalties manually
-    researcher_used = set(r for r in resolved if r is not None)
-    unused_penalty = 0
-    for r in researchers.values():
-        if r.researcher_id not in researcher_used:
-            if r.first_participation:
-                unused_penalty += DEFAULT_CONFIG["w_first_year_researcher"]
-            if r.can_travel:
-                unused_penalty += DEFAULT_CONFIG["w_travel_researcher"]
-
-    hist_penalty = 0
-    for t_id, r_str in enumerate(resolved):
-        if r_str is None:
-            continue
-        r = researchers.get(r_str)
-        if r is None:
-            continue
-        school = schools[talks[t_id].school_id]
-        if r.previous_school and r.previous_school == talks[t_id].school_id:
-            hist_penalty += DEFAULT_CONFIG["w_same_school_as_last_year"]
-        if r.previous_talk_province and school.location == "province":
-            hist_penalty += DEFAULT_CONFIG["w_same_province_as_last_year"]
-
-    assigned_schools = {talks[i].school_id for i, r in enumerate(resolved)
-                        if r is not None}
-    unserved_penalty = 0
-    for s_id, s in schools.items():
-        if s_id in assigned_schools:
-            continue
-        if s.first_year:
-            unserved_penalty += DEFAULT_CONFIG["w_first_year_school"]
-        if s.location == "province":
-            unserved_penalty += DEFAULT_CONFIG["w_province_school"]
-        if s.disadvantaged_area:
-            unserved_penalty += DEFAULT_CONFIG["w_disadvantaged"]
-        if s.school_type == "public":
-            unserved_penalty += DEFAULT_CONFIG["w_public_institution"]
-        elif s.school_type == "concerted":
-            unserved_penalty += DEFAULT_CONFIG["w_concerted"]
-
-    unassigned_penalty = n_unassigned * DEFAULT_CONFIG["w_unassigned_talk"]
-
-    # Ensure all components are non-negative
-    components = {
-        "Unused researchers": max(0, unused_penalty),
-        "Historical": max(0, hist_penalty),
-        "Unserved schools (soft)": max(0, unserved_penalty),
-        "Unassigned talks": max(0, unassigned_penalty),
-    }
+    components = compute_penalty_breakdown(
+        best_c, talks, schools, researchers, DEFAULT_CONFIG,
+    )
 
     # If best_f is larger than sum, remaining is "crossover/startup variance"
     # Otherwise use best_f directly
@@ -383,18 +242,32 @@ def plot_fitness_breakdown(output_path):
 # Main
 # ---------------------------------------------------------------------------
 
-def main():
+def main(fast: bool = False):
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--fast", action="store_true", help="Quick run")
+    args, _ = parser.parse_known_args()
+    fast = fast or args.fast
+
     print("=== CHC Benchmark — Scalability & Realism ===\n")
 
     # Instance sizes: (T, E, R, pop, gens)
     # Lower ratios (pop/T ≈ 2-3) so convergence is visible, not instant
-    configs = [
-        (15,  7, 20,  80, 300),
-        (30, 10, 35,  80, 300),
-        (45, 12, 50, 100, 300),
-        (60, 15, 65, 120, 300),
-    ]
-    n_seeds = 3
+    if fast:
+        configs = [
+            (15,  7, 20,  40, 50),
+            (30, 10, 35,  40, 50),
+        ]
+        n_seeds = 1
+    else:
+        configs = [
+            (15,  7, 20,  80, 300),
+            (30, 10, 35,  80, 300),
+            (45, 12, 50, 100, 300),
+            (60, 15, 65, 120, 300),
+        ]
+        n_seeds = 3
 
     # --- Plot 1 & 3: scalability + feasibility ---
     results = {}
@@ -405,7 +278,8 @@ def main():
 
         times, fits = [], []
         for seed in range(1, n_seeds + 1):
-            s, t, r = generate_realistic(E, T, R, prob_topics=0.2, seed=seed)
+            s, t, r = generate_instance(E, T, R, prob_topics=0.2, seed=seed,
+                                         balance_levels=False)
             elapsed, best_f, _ = run_one_instance(s, t, r, pop, gens, seed)
             times.append(elapsed)
             fits.append(best_f)
@@ -413,8 +287,8 @@ def main():
         # Capture fitnesses for the largest instance (T=60, 5 runs)
         if T == 60:
             for seed in range(1, 6):
-                s, t, r = generate_realistic(E, T, R, prob_topics=0.2,
-                                              seed=seed)
+                s, t, r = generate_instance(E, T, R, prob_topics=0.2,
+                                              seed=seed, balance_levels=False)
                 elapsed, best_f, _ = run_one_instance(s, t, r, pop, gens, seed)
                 realistic_fitnesses.append(best_f)
 

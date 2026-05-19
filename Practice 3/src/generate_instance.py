@@ -38,6 +38,7 @@ def generate_instance(
     max_talks_researchers: int = 2,
     prob_topics: float = 0.2,
     seed: int | None = None,
+    balance_levels: bool = True,
 ) -> Tuple[Dict[str, School], List[Talk], Dict[str, Researcher]]:
     """
     Generate a random instance using the same logic as the professor's
@@ -160,20 +161,21 @@ def generate_instance(
 
     # Balance researcher levels so every level has at least the minimum
     # needed to cover its fair share of talks (avoids infeasible seeds)
-    from collections import Counter
-    all_levels = ["preschool", "primary", "secondary",
-                  "high school", "vocational training"]
-    level_counts = Counter(r.level for r in researchers.values())
-    min_per_level = max(2, (num_talks // len(all_levels) + 1) // 2)
+    if balance_levels:
+        from collections import Counter
+        all_levels = ["preschool", "primary", "secondary",
+                      "high school", "vocational training"]
+        level_counts = Counter(r.level for r in researchers.values())
+        min_per_level = max(2, (num_talks // len(all_levels) + 1) // 2)
 
-    for lvl in all_levels:
-        while level_counts.get(lvl, 0) < min_per_level:
-            donor = next((r for r in researchers.values()
-                         if level_counts.get(r.level, 0) > min_per_level), None)
-            if donor is None:
-                break
-            level_counts[donor.level] -= 1
-            donor.level = lvl
-            level_counts[lvl] = level_counts.get(lvl, 0) + 1
+        for lvl in all_levels:
+            while level_counts.get(lvl, 0) < min_per_level:
+                donor = next((r for r in researchers.values()
+                             if level_counts.get(r.level, 0) > min_per_level), None)
+                if donor is None:
+                    break
+                level_counts[donor.level] -= 1
+                donor.level = lvl
+                level_counts[lvl] = level_counts.get(lvl, 0) + 1
 
     return schools, talks, researchers

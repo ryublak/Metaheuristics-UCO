@@ -19,8 +19,6 @@ import time
 from pathlib import Path
 from typing import Dict, List
 
-import pandas as pd
-
 # Ensure src/ is on the path when running from the project root
 sys.path.insert(0, str(Path(__file__).parent))
 
