@@ -1,47 +1,78 @@
-# Metaheuristics Coursework 🚀
+# Metaheuristics — University of Córdoba
 
-Central repository containing the assignments and algorithms developed for the Metaheuristics course. 
+Coursework repository containing the three practical assignments developed for the
+Metaheuristics subject.
 
-All code is written in Python, with virtual environments and dependencies managed quickly and efficiently using `uv`.
+## Projects
 
-## 📁 Project Structure
+### Practice 1 — Local Search
+Exploratory analysis of time series data using local search heuristics, implemented
+as a Jupyter notebook (`P1MtH.ipynb`).
 
-The repository is organized by independent assignments. Each folder contains its own source code, data, and dependency tracking file (`uv.lock`).
+### Practice 2 — Genetic Algorithm for Hyperparameter Tuning
+Adaptive Genetic Algorithm that optimises a `RandomForestClassifier` on the Wine
+Quality dataset (`winequality-red.csv`). Features Hamming-distance diversity
+enforcement, adaptive crossover and mutation rates, fitness caching, and
+StratifiedKFold validation. Benchmarked against Grid Search and Random Search.
 
-* `Practice 1/`: [Brief description of practice 1, e.g., Local search algorithms]
-* `Practice 2/`: [Brief description, e.g., Wine quality prediction using winequality-red.csv]
-* `Practice 3/`: [To be added...]
+### Practice 3 — CHC Metaheuristic for Talk Allocation
+CHC evolutionary algorithm that matches scientific outreach talks requested by
+local schools to researchers from the University of Córdoba for the International
+Day of Women and Girls in Science. The implementation handles hard constraints
+(topic, level, travel, coverage) and a rich set of lexicographic soft priorities
+(school equity, researcher rotation, historical patterns).
 
-## 🛠️ Setup and Installation
+Key features:
+- Modular penalty-based fitness with configurable weights
+- 2-pass chromosome initialisation (one talk per school guaranteed)
+- HUX crossover with incest prevention via dynamic Hamming threshold
+- Multi-survivor cataclysmic restarts with adaptive mutation rate
+- Stagnation detection and gradual threshold reset
+- Two-phase repair operator (overallocation + fill unassigned)
+- Complete elite set returned to the user as ranked alternatives
 
-To run any of the assignments locally, ensure you have [uv](https://github.com/astral-sh/uv) installed on your system.
-
-1. **Clone this repository:**
-   ```bash
-   git clone https://github.com/ryublak/Metaheuristics-UCO.git
-   ```
-
-2. **Navigate to the desired assignment folder:**
-   ```bash
-   cd "your-repo-name/Practice 2"
-   ```
-
-3. **Install dependencies and automatically create the environment:**
-   ```bash
-   uv sync
-   ```
-   *Note: This reads the `uv.lock` file to replicate the exact environment used for the project.*
-
-## 🚀 Usage
-
-Once the environment is synced with `uv`, you can run the main script directly with:
+## Setup
 
 ```bash
-uv run src/main.py
+git clone git@github.com:ryublak/Metaheuristics-UCO.git
+cd Metaheuristics-UCO/"Practice 3"
 ```
 
-## 📄 License
+Practice 2 uses `uv` for dependency management:
 
-Copyright (c) 2026 [Rafael Carlo Schoettel Vilchez/Jesus Lopez]. All rights reserved. 
+```bash
+cd "Practice 2"
+uv sync
+```
 
-This code is for purely academic purposes. Unauthorized use, copying, modification, or distribution of this project, via any medium, is strictly prohibited without express permission.
+Practice 3 uses standard Python (no virtual environment configured yet):
+
+```bash
+cd "Practice 3"
+pip install pandas numpy matplotlib
+```
+
+## Usage
+
+```bash
+# Practice 3 — run on a generated instance
+python3 "Practice 3/src/main.py" --seed 42 --verbose
+
+# Practice 3 — run with custom instance parameters
+python3 "Practice 3/src/main.py" --num-schools 10 --num-talks 20 --num-researchers 15 --prob-topics 0.2
+
+# Practice 3 — run with CSV files
+python3 "Practice 3/src/main.py" --schools data/schools.csv --talks data/talks.csv --researchers data/researchers.csv
+
+# Practice 3 — generate report-quality plots (5-run averaged convergence)
+python3 "Practice 3/src/generate_report_plots.py"
+
+# Build the LaTeX report
+cd "Practice 3/docs" && bash build.sh
+```
+
+## License
+
+Copyright © 2026 Rafael Carlo Schoettel Vilchez, Jesús Fernández López.
+All rights reserved. Unauthorised use, copying, modification, or distribution
+is strictly prohibited. This code is for academic purposes only.
